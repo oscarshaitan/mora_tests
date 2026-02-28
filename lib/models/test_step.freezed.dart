@@ -15,7 +15,12 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$TestStep {
 
- String get id; String get instruction; String? get hint; String? get assertion; int get timeoutSeconds;
+ String get id; String get instruction; String? get hint; String? get assertion; int get timeoutSeconds;/// When set, the step runs as an explore/multi-turn loop.
+/// The LLM will take up to [maxSubSteps] individual actions (click, scroll,
+/// type, navigate, etc.) until it decides the goal is reached (done) or
+/// gives up (fail). Useful for vague navigation instructions like
+/// "go to Company X → Programme Y → Project Z".
+ int? get maxSubSteps;
 /// Create a copy of TestStep
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -28,16 +33,16 @@ $TestStepCopyWith<TestStep> get copyWith => _$TestStepCopyWithImpl<TestStep>(thi
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is TestStep&&(identical(other.id, id) || other.id == id)&&(identical(other.instruction, instruction) || other.instruction == instruction)&&(identical(other.hint, hint) || other.hint == hint)&&(identical(other.assertion, assertion) || other.assertion == assertion)&&(identical(other.timeoutSeconds, timeoutSeconds) || other.timeoutSeconds == timeoutSeconds));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is TestStep&&(identical(other.id, id) || other.id == id)&&(identical(other.instruction, instruction) || other.instruction == instruction)&&(identical(other.hint, hint) || other.hint == hint)&&(identical(other.assertion, assertion) || other.assertion == assertion)&&(identical(other.timeoutSeconds, timeoutSeconds) || other.timeoutSeconds == timeoutSeconds)&&(identical(other.maxSubSteps, maxSubSteps) || other.maxSubSteps == maxSubSteps));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,instruction,hint,assertion,timeoutSeconds);
+int get hashCode => Object.hash(runtimeType,id,instruction,hint,assertion,timeoutSeconds,maxSubSteps);
 
 @override
 String toString() {
-  return 'TestStep(id: $id, instruction: $instruction, hint: $hint, assertion: $assertion, timeoutSeconds: $timeoutSeconds)';
+  return 'TestStep(id: $id, instruction: $instruction, hint: $hint, assertion: $assertion, timeoutSeconds: $timeoutSeconds, maxSubSteps: $maxSubSteps)';
 }
 
 
@@ -48,7 +53,7 @@ abstract mixin class $TestStepCopyWith<$Res>  {
   factory $TestStepCopyWith(TestStep value, $Res Function(TestStep) _then) = _$TestStepCopyWithImpl;
 @useResult
 $Res call({
- String id, String instruction, String? hint, String? assertion, int timeoutSeconds
+ String id, String instruction, String? hint, String? assertion, int timeoutSeconds, int? maxSubSteps
 });
 
 
@@ -65,14 +70,15 @@ class _$TestStepCopyWithImpl<$Res>
 
 /// Create a copy of TestStep
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? instruction = null,Object? hint = freezed,Object? assertion = freezed,Object? timeoutSeconds = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? instruction = null,Object? hint = freezed,Object? assertion = freezed,Object? timeoutSeconds = null,Object? maxSubSteps = freezed,}) {
   return _then(_self.copyWith(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,instruction: null == instruction ? _self.instruction : instruction // ignore: cast_nullable_to_non_nullable
 as String,hint: freezed == hint ? _self.hint : hint // ignore: cast_nullable_to_non_nullable
 as String?,assertion: freezed == assertion ? _self.assertion : assertion // ignore: cast_nullable_to_non_nullable
 as String?,timeoutSeconds: null == timeoutSeconds ? _self.timeoutSeconds : timeoutSeconds // ignore: cast_nullable_to_non_nullable
-as int,
+as int,maxSubSteps: freezed == maxSubSteps ? _self.maxSubSteps : maxSubSteps // ignore: cast_nullable_to_non_nullable
+as int?,
   ));
 }
 
@@ -157,10 +163,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String instruction,  String? hint,  String? assertion,  int timeoutSeconds)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String instruction,  String? hint,  String? assertion,  int timeoutSeconds,  int? maxSubSteps)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _TestStep() when $default != null:
-return $default(_that.id,_that.instruction,_that.hint,_that.assertion,_that.timeoutSeconds);case _:
+return $default(_that.id,_that.instruction,_that.hint,_that.assertion,_that.timeoutSeconds,_that.maxSubSteps);case _:
   return orElse();
 
 }
@@ -178,10 +184,10 @@ return $default(_that.id,_that.instruction,_that.hint,_that.assertion,_that.time
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String instruction,  String? hint,  String? assertion,  int timeoutSeconds)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String instruction,  String? hint,  String? assertion,  int timeoutSeconds,  int? maxSubSteps)  $default,) {final _that = this;
 switch (_that) {
 case _TestStep():
-return $default(_that.id,_that.instruction,_that.hint,_that.assertion,_that.timeoutSeconds);case _:
+return $default(_that.id,_that.instruction,_that.hint,_that.assertion,_that.timeoutSeconds,_that.maxSubSteps);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -198,10 +204,10 @@ return $default(_that.id,_that.instruction,_that.hint,_that.assertion,_that.time
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String instruction,  String? hint,  String? assertion,  int timeoutSeconds)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String instruction,  String? hint,  String? assertion,  int timeoutSeconds,  int? maxSubSteps)?  $default,) {final _that = this;
 switch (_that) {
 case _TestStep() when $default != null:
-return $default(_that.id,_that.instruction,_that.hint,_that.assertion,_that.timeoutSeconds);case _:
+return $default(_that.id,_that.instruction,_that.hint,_that.assertion,_that.timeoutSeconds,_that.maxSubSteps);case _:
   return null;
 
 }
@@ -213,7 +219,7 @@ return $default(_that.id,_that.instruction,_that.hint,_that.assertion,_that.time
 @JsonSerializable()
 
 class _TestStep implements TestStep {
-  const _TestStep({required this.id, required this.instruction, this.hint, this.assertion, this.timeoutSeconds = 30});
+  const _TestStep({required this.id, required this.instruction, this.hint, this.assertion, this.timeoutSeconds = 30, this.maxSubSteps = null});
   factory _TestStep.fromJson(Map<String, dynamic> json) => _$TestStepFromJson(json);
 
 @override final  String id;
@@ -221,6 +227,12 @@ class _TestStep implements TestStep {
 @override final  String? hint;
 @override final  String? assertion;
 @override@JsonKey() final  int timeoutSeconds;
+/// When set, the step runs as an explore/multi-turn loop.
+/// The LLM will take up to [maxSubSteps] individual actions (click, scroll,
+/// type, navigate, etc.) until it decides the goal is reached (done) or
+/// gives up (fail). Useful for vague navigation instructions like
+/// "go to Company X → Programme Y → Project Z".
+@override@JsonKey() final  int? maxSubSteps;
 
 /// Create a copy of TestStep
 /// with the given fields replaced by the non-null parameter values.
@@ -235,16 +247,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _TestStep&&(identical(other.id, id) || other.id == id)&&(identical(other.instruction, instruction) || other.instruction == instruction)&&(identical(other.hint, hint) || other.hint == hint)&&(identical(other.assertion, assertion) || other.assertion == assertion)&&(identical(other.timeoutSeconds, timeoutSeconds) || other.timeoutSeconds == timeoutSeconds));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _TestStep&&(identical(other.id, id) || other.id == id)&&(identical(other.instruction, instruction) || other.instruction == instruction)&&(identical(other.hint, hint) || other.hint == hint)&&(identical(other.assertion, assertion) || other.assertion == assertion)&&(identical(other.timeoutSeconds, timeoutSeconds) || other.timeoutSeconds == timeoutSeconds)&&(identical(other.maxSubSteps, maxSubSteps) || other.maxSubSteps == maxSubSteps));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,instruction,hint,assertion,timeoutSeconds);
+int get hashCode => Object.hash(runtimeType,id,instruction,hint,assertion,timeoutSeconds,maxSubSteps);
 
 @override
 String toString() {
-  return 'TestStep(id: $id, instruction: $instruction, hint: $hint, assertion: $assertion, timeoutSeconds: $timeoutSeconds)';
+  return 'TestStep(id: $id, instruction: $instruction, hint: $hint, assertion: $assertion, timeoutSeconds: $timeoutSeconds, maxSubSteps: $maxSubSteps)';
 }
 
 
@@ -255,7 +267,7 @@ abstract mixin class _$TestStepCopyWith<$Res> implements $TestStepCopyWith<$Res>
   factory _$TestStepCopyWith(_TestStep value, $Res Function(_TestStep) _then) = __$TestStepCopyWithImpl;
 @override @useResult
 $Res call({
- String id, String instruction, String? hint, String? assertion, int timeoutSeconds
+ String id, String instruction, String? hint, String? assertion, int timeoutSeconds, int? maxSubSteps
 });
 
 
@@ -272,14 +284,15 @@ class __$TestStepCopyWithImpl<$Res>
 
 /// Create a copy of TestStep
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? instruction = null,Object? hint = freezed,Object? assertion = freezed,Object? timeoutSeconds = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? instruction = null,Object? hint = freezed,Object? assertion = freezed,Object? timeoutSeconds = null,Object? maxSubSteps = freezed,}) {
   return _then(_TestStep(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,instruction: null == instruction ? _self.instruction : instruction // ignore: cast_nullable_to_non_nullable
 as String,hint: freezed == hint ? _self.hint : hint // ignore: cast_nullable_to_non_nullable
 as String?,assertion: freezed == assertion ? _self.assertion : assertion // ignore: cast_nullable_to_non_nullable
 as String?,timeoutSeconds: null == timeoutSeconds ? _self.timeoutSeconds : timeoutSeconds // ignore: cast_nullable_to_non_nullable
-as int,
+as int,maxSubSteps: freezed == maxSubSteps ? _self.maxSubSteps : maxSubSteps // ignore: cast_nullable_to_non_nullable
+as int?,
   ));
 }
 

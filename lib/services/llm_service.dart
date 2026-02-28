@@ -15,8 +15,9 @@ other web app — its UI elements are rendered visually on screen.
 Your job is to analyze the screenshot and return a SINGLE JSON action.
 
 CRITICAL RULES:
-1. Always respond with ONLY a valid JSON object. No markdown fences, no \
-explanation outside the JSON.
+1. Your ENTIRE response must be a single raw JSON object. Start with { and \
+end with }. No markdown fences (no ```), no prose before or after the JSON, \
+no explanation outside the object.
 2. For click, doubleClick, and longPress actions you MUST use pixel \
 coordinates (x, y). Set css_selector and xpath_selector to null. Identify \
 the element visually from the screenshot and return the center pixel \
@@ -82,6 +83,12 @@ class LlmService {
     String? assertion,
     String? previousActionName,
     String? previousError,
+    /// For explore/multi-turn steps: a log of sub-steps already executed,
+    /// newest last. E.g. ["sub-step 1: click (245,312) — Clicked Companies menu",
+    /// "sub-step 2: click (180,445) — Clicked Symterra row"].
+    /// When present the LLM understands it is mid-way through a goal and must
+    /// continue from the current screenshot state.
+    List<String>? subHistory,
   }) async {
     final screenshotB64 = base64Encode(screenshot);
 
@@ -90,6 +97,18 @@ class LlmService {
       if (hint != null && hint.isNotEmpty) 'HINT: $hint',
       if (assertion != null && assertion.isNotEmpty)
         'ASSERTION (must be true after the action): $assertion',
+      // Explore-mode history: show what has already been done so the LLM
+      // knows where to continue from.
+      if (subHistory != null && subHistory.isNotEmpty) ...[
+        'EXPLORE MODE — sub-steps already SUCCESSFULLY executed (most recent last):',
+        ...subHistory.map((h) => '  • $h'),
+        'IMPORTANT: Every sub-step listed above was fully executed and succeeded. '
+            'Trust the history even when the screenshot looks unchanged '
+            '(e.g. password fields show only dots after typing, canvas apps '
+            'may not visually update immediately). '
+            'Do NOT repeat any action already listed above. '
+            'If the overall goal is now achieved, return action "done".',
+      ],
       if (previousActionName != null)
         'PREVIOUS ATTEMPT: tried action "$previousActionName"',
       if (previousError != null) 'PREVIOUS ERROR: $previousError',
@@ -117,6 +136,9 @@ class LlmService {
       'messages': messages,
       'max_tokens': maxTokens,
       'temperature': temperature,
+      // Force the vLLM / OVH backend to emit valid JSON via guided decoding.
+      // This is the primary defence against garbled or fence-wrapped output.
+      'response_format': {'type': 'json_object'},
     };
 
     final response = await http
@@ -140,18 +162,46 @@ class LlmService {
     final content =
         data['choices'][0]['message']['content'] as String? ?? '{}';
 
-    // Strip markdown fences if model includes them despite instructions
-    final cleaned = content
-        .replaceAll(RegExp(r'```json\s*'), '')
-        .replaceAll(RegExp(r'```\s*'), '')
-        .trim();
+    final cleaned = _extractJson(content);
 
     try {
       final actionJson = jsonDecode(cleaned) as Map<String, dynamic>;
       return _parseAction(actionJson, content);
     } catch (e) {
-      throw LlmException('Failed to parse LLM response: $cleaned');
+      // Include a snippet of the raw output so the RETRY log is diagnostic.
+      final snippet = content.length > 200
+          ? '${content.substring(0, 200)}…'
+          : content;
+      throw LlmException('Failed to parse LLM response: $snippet');
     }
+  }
+
+  /// Extracts a clean JSON object string from raw LLM output.
+  ///
+  /// Handles the most common model misbehaviours in order:
+  ///  1. Markdown code fences  (``` or ```json)
+  ///  2. Prose before / after the JSON braces
+  ///  3. Trailing commas before `}` or `]`  (invalid JSON but common output)
+  String _extractJson(String raw) {
+    // 1. Strip markdown fences.
+    var s = raw
+        .replaceAll(RegExp(r'```json\s*', caseSensitive: false), '')
+        .replaceAll(RegExp(r'```\s*'), '')
+        .trim();
+
+    // 2. Isolate the outermost JSON object.
+    //    Find the first '{' and the last '}' — any prose the model placed
+    //    before or after is discarded.
+    final start = s.indexOf('{');
+    final end = s.lastIndexOf('}');
+    if (start >= 0 && end > start) {
+      s = s.substring(start, end + 1);
+    }
+
+    // 3. Remove trailing commas before } or ] (models do this occasionally).
+    s = s.replaceAll(RegExp(r',(\s*[}\]])'), r'$1');
+
+    return s;
   }
 
   LlmAction _parseAction(Map<String, dynamic> json, String rawResponse) {

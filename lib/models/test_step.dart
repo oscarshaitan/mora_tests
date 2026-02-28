@@ -11,6 +11,12 @@ abstract class TestStep with _$TestStep {
     String? hint,
     String? assertion,
     @Default(30) int timeoutSeconds,
+    /// When set, the step runs as an explore/multi-turn loop.
+    /// The LLM will take up to [maxSubSteps] individual actions (click, scroll,
+    /// type, navigate, etc.) until it decides the goal is reached (done) or
+    /// gives up (fail). Useful for vague navigation instructions like
+    /// "go to Company X → Programme Y → Project Z".
+    @Default(null) int? maxSubSteps,
   }) = _TestStep;
 
   factory TestStep.fromJson(Map<String, Object?> json) =>

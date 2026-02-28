@@ -17,6 +17,16 @@ steps:
   - id: "b46e4773-cd75-437a-a661-f6aaef8dd930"
     instruction: "write  in the password field Testing123!"
     timeout: 30
+    max_sub_steps: 3
   - id: "aef8f941-3049-4f08-83d2-078127d708d8"
-    instruction: "Tap Next button"
+    instruction: "Tap Login button"
     timeout: 30
+  - id: "6eac45ce-5dad-48b1-bcd0-92868b55881f"
+    instruction: "wait 5 sec"
+    timeout: 30
+  - id: "06368c65-0c3d-4a35-8493-c76b074fc2f9"
+    instruction: "Navigate to the SmarNote Feed"
+    hint: "Use the left navigation panel"
+    assert: "Shoudl be able to see the Add SmartNote FAB button"
+    timeout: 30
+    max_sub_steps: 3

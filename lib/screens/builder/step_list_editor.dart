@@ -69,26 +69,33 @@ class _StepCardState extends State<_StepCard> {
   late TextEditingController _hintCtrl;
   late TextEditingController _assertCtrl;
   late TextEditingController _timeoutCtrl;
+  late TextEditingController _subStepsCtrl;
+  late bool _exploreMode;
 
   @override
   void initState() {
     super.initState();
+    _exploreMode = widget.step.maxSubSteps != null;
     _instructionCtrl =
         TextEditingController(text: widget.step.instruction);
     _hintCtrl = TextEditingController(text: widget.step.hint ?? '');
     _assertCtrl = TextEditingController(text: widget.step.assertion ?? '');
     _timeoutCtrl =
         TextEditingController(text: widget.step.timeoutSeconds.toString());
+    _subStepsCtrl = TextEditingController(
+        text: (widget.step.maxSubSteps ?? 10).toString());
   }
 
   @override
   void didUpdateWidget(_StepCard old) {
     super.didUpdateWidget(old);
     if (old.step.id != widget.step.id) {
+      _exploreMode = widget.step.maxSubSteps != null;
       _instructionCtrl.text = widget.step.instruction;
       _hintCtrl.text = widget.step.hint ?? '';
       _assertCtrl.text = widget.step.assertion ?? '';
       _timeoutCtrl.text = widget.step.timeoutSeconds.toString();
+      _subStepsCtrl.text = (widget.step.maxSubSteps ?? 10).toString();
     }
   }
 
@@ -98,6 +105,7 @@ class _StepCardState extends State<_StepCard> {
     _hintCtrl.dispose();
     _assertCtrl.dispose();
     _timeoutCtrl.dispose();
+    _subStepsCtrl.dispose();
     super.dispose();
   }
 
@@ -107,6 +115,8 @@ class _StepCardState extends State<_StepCard> {
       hint: _hintCtrl.text.isEmpty ? null : _hintCtrl.text,
       assertion: _assertCtrl.text.isEmpty ? null : _assertCtrl.text,
       timeoutSeconds: int.tryParse(_timeoutCtrl.text) ?? 30,
+      maxSubSteps:
+          _exploreMode ? (int.tryParse(_subStepsCtrl.text) ?? 10) : null,
     ));
   }
 
@@ -175,18 +185,69 @@ class _StepCardState extends State<_StepCard> {
               onChanged: (_) => _notify(),
             ),
             const SizedBox(height: 8),
-            SizedBox(
-              width: 120,
-              child: TextFormField(
-                controller: _timeoutCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Timeout (sec)',
-                  border: OutlineInputBorder(),
-                  isDense: true,
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                SizedBox(
+                  width: 120,
+                  child: TextFormField(
+                    controller: _timeoutCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Timeout (sec)',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                    keyboardType: TextInputType.number,
+                    onChanged: (_) => _notify(),
+                  ),
                 ),
-                keyboardType: TextInputType.number,
-                onChanged: (_) => _notify(),
-              ),
+                const SizedBox(width: 16),
+                // ── Explore mode toggle ──────────────────────────────────
+                InkWell(
+                  borderRadius: BorderRadius.circular(6),
+                  onTap: () {
+                    setState(() => _exploreMode = !_exploreMode);
+                    _notify();
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 6, vertical: 4),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Switch(
+                          value: _exploreMode,
+                          materialTapTargetSize:
+                              MaterialTapTargetSize.shrinkWrap,
+                          onChanged: (v) {
+                            setState(() => _exploreMode = v);
+                            _notify();
+                          },
+                        ),
+                        const SizedBox(width: 4),
+                        const Text('Explore mode'),
+                      ],
+                    ),
+                  ),
+                ),
+                // Sub-steps count — only shown when explore mode is on
+                if (_exploreMode) ...[
+                  const SizedBox(width: 12),
+                  SizedBox(
+                    width: 90,
+                    child: TextFormField(
+                      controller: _subStepsCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Sub-steps',
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                      keyboardType: TextInputType.number,
+                      onChanged: (_) => _notify(),
+                    ),
+                  ),
+                ],
+              ],
             ),
           ],
         ),

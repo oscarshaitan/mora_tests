@@ -57,7 +57,7 @@ class TestRunner {
     }
 
     try {
-      // 2. Navigate to start URL
+      // 2. Navigate to start URL using whatever session state exists.
       await webViewService.navigate(testCase.startUrl);
       await Future.delayed(const Duration(seconds: 1));
 
@@ -87,12 +87,20 @@ class TestRunner {
         );
       }
     } finally {
-      // 4. Always call teardown
+      // 4. Always call teardown hook
       if (testCase.teardown != null) {
         try {
           await httpHookService.call(testCase.teardown!);
         } catch (_) {}
       }
+
+      // 5. Clean browser state after every run (pass, fail or abort) so the
+      //    next run always starts from a logged-out baseline.
+      //    Uses navigate(clean:true): clears cookies, cache, localStorage,
+      //    sessionStorage, then reloads — browser ends on the login screen.
+      try {
+        await webViewService.navigate(testCase.startUrl, clean: true);
+      } catch (_) {}
     }
 
     return run.copyWith(
@@ -105,6 +113,11 @@ class TestRunner {
     required TestStep step,
     required Map<String, String> variables,
   }) async {
+    // Explore steps have their own multi-turn loop.
+    if (step.maxSubSteps != null) {
+      return _runExploreStep(step: step, variables: variables);
+    }
+
     final stopwatch = Stopwatch()..start();
     final instruction = _interpolate(step.instruction, variables);
     final hint = step.hint != null ? _interpolate(step.hint!, variables) : null;
@@ -195,7 +208,7 @@ class TestRunner {
             executedAt: DateTime.now(),
           );
         }
-        final briefError = (lastError ?? '').split('\n').first.split(': {').first;
+        final briefError = lastError.split('\n').first.split(': {').first;
         dev.log(
           '  RETRY ${attempt + 1}/${AppConstants.maxRetries} — $briefError',
           name: 'SymUITest',
@@ -206,6 +219,128 @@ class TestRunner {
 
     // Unreachable
     throw StateError('Unreachable');
+  }
+
+  /// Runs a step in explore / multi-turn mode.
+  ///
+  /// The LLM is called up to [step.maxSubSteps] times. Each call receives the
+  /// current screenshot PLUS the growing history of sub-steps already taken,
+  /// so it always knows where it is and what still needs to happen.
+  ///
+  ///  • LLM returns `done`  → step succeeds (goal reached).
+  ///  • LLM returns `fail`  → step fails immediately.
+  ///  • All sub-steps used without `done` → step fails with a timeout message.
+  Future<StepResult> _runExploreStep({
+    required TestStep step,
+    required Map<String, String> variables,
+  }) async {
+    final stopwatch = Stopwatch()..start();
+    final instruction = _interpolate(step.instruction, variables);
+    final hint = step.hint != null ? _interpolate(step.hint!, variables) : null;
+    final assertion =
+        step.assertion != null ? _interpolate(step.assertion!, variables) : null;
+    final maxSubSteps = step.maxSubSteps!;
+
+    dev.log('─' * 56, name: 'SymUITest');
+    dev.log('Explore ($maxSubSteps sub-steps max): $instruction',
+        name: 'SymUITest');
+
+    // Capped history: we keep the last 6 entries to bound token usage while
+    // still giving the LLM enough context to avoid re-doing completed steps.
+    final history = <String>[];
+    Uint8List? firstScreenshot;
+
+    for (int sub = 1; sub <= maxSubSteps; sub++) {
+      if (_aborted) break;
+
+      try {
+        final screenshot = await webViewService.screenshot();
+        firstScreenshot ??= screenshot;
+
+        dev.log('  [$sub/$maxSubSteps]', name: 'SymUITest');
+
+        final recentHistory =
+            history.length > 6 ? history.sublist(history.length - 6) : history;
+
+        final action = await llmService.interpretStep(
+          instruction: instruction,
+          screenshot: screenshot,
+          hint: hint,
+          assertion: assertion,
+          subHistory: recentHistory.isEmpty ? null : recentHistory,
+        );
+
+        final conf = '${(action.confidence * 100).toStringAsFixed(0)}%';
+        dev.log('  LLM: ${_shortenReasoning(action.reasoning)} ($conf)',
+            name: 'SymUITest');
+
+        // Goal reached ✓
+        if (action.type == ActionType.done) {
+          final after = await _safeScreenshot();
+          return StepResult(
+            stepId: step.id,
+            success: true,
+            actionTaken: action,
+            screenshotBefore: firstScreenshot,
+            screenshotAfter: after,
+            rawLlmResponse: action.reasoning,
+            duration: stopwatch.elapsed,
+            executedAt: DateTime.now(),
+          );
+        }
+
+        // LLM gave up ✗
+        if (action.type == ActionType.fail) {
+          return StepResult(
+            stepId: step.id,
+            success: false,
+            actionTaken: action,
+            screenshotBefore: screenshot,
+            errorMessage: 'Explore: LLM reported failure: ${action.reasoning}',
+            rawLlmResponse: action.reasoning,
+            duration: stopwatch.elapsed,
+            executedAt: DateTime.now(),
+          );
+        }
+
+        // Execute the sub-action
+        dev.log('  ${_formatActionLog(action)}', name: 'SymUITest');
+        await webViewService.executeAction(action);
+        await Future.delayed(
+          const Duration(milliseconds: AppConstants.settleDelayMs),
+        );
+
+        // Record in history so the LLM sees what was done.
+        // "[DONE]" prefix is intentional — it signals to the LLM that this
+        // action already succeeded and must not be repeated.
+        final coords = (action.x != null && action.y != null)
+            ? ' (${action.x!.toStringAsFixed(0)},${action.y!.toStringAsFixed(0)})'
+            : '';
+        final val =
+            action.value != null ? ' value="${action.value}"' : '';
+        history.add(
+          '[DONE] sub-step $sub: ${action.type.name}$coords$val'
+          ' — ${_shortenReasoning(action.reasoning)}',
+        );
+      } catch (e) {
+        // Sub-step errors are non-fatal; log and let the loop continue.
+        final brief = e.toString().split('\n').first.split(': {').first;
+        dev.log('  [$sub/$maxSubSteps] error: $brief', name: 'SymUITest');
+      }
+    }
+
+    // Ran out of sub-steps without reaching done
+    final fallback = await _safeScreenshot();
+    return StepResult(
+      stepId: step.id,
+      success: false,
+      screenshotBefore: firstScreenshot ?? fallback ?? _emptyPng(),
+      screenshotAfter: fallback,
+      errorMessage:
+          'Explore: goal not reached after $maxSubSteps sub-steps',
+      duration: stopwatch.elapsed,
+      executedAt: DateTime.now(),
+    );
   }
 
   String _formatDuration(Duration d) {
@@ -222,7 +357,7 @@ class TestRunner {
   }
 
   /// Formats a one-line action log in the agreed style:
-  ///   JS Action: <TYPE>  val="<val>"  xy=(<x>,<y>)  sel=<sel>
+  ///   `JS Action: TYPE  val="val"  xy=(x,y)  sel=sel`
   String _formatActionLog(LlmAction action) {
     final type = action.type.name;
     final val  = action.value ?? action.key ?? action.url;

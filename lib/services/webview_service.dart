@@ -401,15 +401,58 @@ class WebViewService {
   // ── Navigation ─────────────────────────────────────────────────────────────
 
   /// Navigate to [url] and wait for the page to finish loading (up to 12s).
-  Future<void> navigate(String url) async {
+  ///
+  /// When [clean] is true the browser state is fully wiped before the test
+  /// starts, guaranteeing a logged-out baseline:
+  ///
+  ///  1. Cookies and HTTP cache are cleared globally (origin-independent).
+  ///  2. The page is loaded so the JS engine is on the correct origin.
+  ///  3. localStorage + sessionStorage are cleared while on that origin
+  ///     (they are origin-scoped — clearing from about:blank does nothing).
+  ///  4. The page is reloaded so the app boots with completely empty storage.
+  ///
+  /// In-test `navigate` actions always use [clean]=false (the default).
+  Future<void> navigate(String url, {bool clean = false}) async {
+    if (clean) {
+      dev.log('Clean navigate → $url', name: 'SymUITest');
+
+      // Step 1 — global clears (work from any origin / any page).
+      try { await CookieManager.instance().deleteAllCookies(); } catch (_) {}
+      try { await InAppWebViewController.clearAllCache(); } catch (_) {}
+      _dpr = 1.0;
+    }
+
+    // Load the page (first load if clean, only load otherwise).
     _loadStopCompleter = Completer<void>();
-    await _ctrl.loadUrl(
-      urlRequest: URLRequest(url: WebUri(url)),
-    );
+    await _ctrl.loadUrl(urlRequest: URLRequest(url: WebUri(url)));
     await _loadStopCompleter!.future.timeout(
       const Duration(seconds: 12),
       onTimeout: () {/* continue */},
     );
+
+    if (clean) {
+      // Step 2 — storage clear: we are now on the correct origin.
+      // localStorage/sessionStorage are scoped to the page origin, so this
+      // must happen after the first load, not from about:blank.
+      try {
+        await _ctrl.evaluateJavascript(source: '''
+(function(){
+  try { window.localStorage.clear();   } catch(e) {}
+  try { window.sessionStorage.clear(); } catch(e) {}
+})()''');
+      } catch (_) {}
+
+      // Step 3 — reload: the app now boots with empty storage and no cookies.
+      dev.log('Storage cleared — reloading for clean start…', name: 'SymUITest');
+      _loadStopCompleter = Completer<void>();
+      await _ctrl.reload();
+      await _loadStopCompleter!.future.timeout(
+        const Duration(seconds: 12),
+        onTimeout: () {/* continue */},
+      );
+      dev.log('Clean navigate ✓', name: 'SymUITest');
+    }
+
     await _readDpr();
   }
 
