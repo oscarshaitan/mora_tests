@@ -74,7 +74,7 @@ class WebViewService {
       );
       return result;
     } catch (e) {
-      dev.log('CDP $method failed: $e', name: 'SymUITest');
+      dev.log('CDP $method failed: $e', name: 'MoraTests');
       rethrow;
     }
   }
@@ -126,7 +126,7 @@ class WebViewService {
   /// Holds the pointer down for [durationMs] before releasing — a long press.
   /// Uses CDP so the browser sees a real sustained pointer contact.
   Future<void> _cdpLongPress(double x, double y, {int durationMs = 800}) async {
-    dev.log('LongPress → ($x, $y) for ${durationMs}ms', name: 'SymUITest');
+    dev.log('LongPress → ($x, $y) for ${durationMs}ms', name: 'MoraTests');
     await _ensureFocus();
 
     final params = {
@@ -143,7 +143,7 @@ class WebViewService {
       await Future.delayed(Duration(milliseconds: durationMs));
       await _cdp('Input.dispatchMouseEvent', {...params, 'type': 'mouseReleased'});
     } catch (e) {
-      dev.log('CDP longPress failed: $e', name: 'SymUITest');
+      dev.log('CDP longPress failed: $e', name: 'MoraTests');
     }
   }
 
@@ -210,19 +210,19 @@ class WebViewService {
     try {
       await _ctrl.evaluateJavascript(source: js);
     } catch (e) {
-      dev.log('JS click failed: $e', name: 'SymUITest');
+      dev.log('JS click failed: $e', name: 'MoraTests');
     }
   }
 
   /// Types a string via CDP Input.insertText.
   /// The browser must already have focus on the target text field.
   Future<void> _cdpType(String text) async {
-    dev.log('Type → "$text"', name: 'SymUITest');
+    dev.log('Type → "$text"', name: 'MoraTests');
     await _ensureFocus();
     try {
       await _cdp('Input.insertText', {'text': text});
     } catch (e) {
-      dev.log('CDP insertText failed: $e — trying JS fallback', name: 'SymUITest');
+      dev.log('CDP insertText failed: $e — trying JS fallback', name: 'MoraTests');
       // JS fallback: type into the currently focused element
       final escaped = text.replaceAll('\\', '\\\\').replaceAll("'", "\\'");
       await _ctrl.evaluateJavascript(source: '''
@@ -244,7 +244,7 @@ class WebViewService {
 
   /// Sends a key press via CDP (e.g. Enter, Tab, Escape).
   Future<void> _cdpKey(String key) async {
-    dev.log('Key → $key', name: 'SymUITest');
+    dev.log('Key → $key', name: 'MoraTests');
     await _ensureFocus();
     final text = _keyText(key);
     final code = _keyCode(key);
@@ -480,14 +480,14 @@ try {
       } catch (_) {}
 
       // Step 3 — reload: the app now boots with empty storage and no cookies.
-      dev.log('Storage cleared — reloading for clean start…', name: 'SymUITest');
+      dev.log('Storage cleared — reloading for clean start…', name: 'MoraTests');
       _loadStopCompleter = Completer<void>();
       await _ctrl.reload();
       await _loadStopCompleter!.future.timeout(
         const Duration(seconds: 12),
         onTimeout: () {/* continue */},
       );
-      dev.log('Clean navigate ✓', name: 'SymUITest');
+      dev.log('Clean navigate ✓', name: 'MoraTests');
     }
 
     await _readDpr();
@@ -526,7 +526,7 @@ try {
 
     if (action.type == ActionType.navigate) {
       if (action.url != null && action.url!.isNotEmpty) {
-        dev.log('NAV → ${action.url}', name: 'SymUITest');
+        dev.log('NAV → ${action.url}', name: 'MoraTests');
         await navigate(action.url!);
       }
       return;
@@ -555,10 +555,10 @@ try {
       } else if (action.cssSelector != null &&
           action.cssSelector!.isNotEmpty) {
         // Coordinates could not be resolved — fall back to pure JS click.
-        dev.log('click: coords not resolved, using JS fallback', name: 'SymUITest');
+        dev.log('click: coords not resolved, using JS fallback', name: 'MoraTests');
         await _jsFallbackClick(action.cssSelector!, isDouble: clickCount == 2);
       } else {
-        dev.log('click: no selector or coordinates available', name: 'SymUITest');
+        dev.log('click: no selector or coordinates available', name: 'MoraTests');
       }
       return;
     }
@@ -624,7 +624,7 @@ try {
       // action.x/y are physical px → convert to CSS px for CDP mouseWheel
       final x = (action.x != null ? action.x! / _dpr : 400.0);
       final y = (action.y != null ? action.y! / _dpr : 300.0);
-      dev.log('Scroll → dx=$dx dy=$dy', name: 'SymUITest');
+      dev.log('Scroll → dx=$dx dy=$dy', name: 'MoraTests');
 
       // Try CDP scroll first
       try {
@@ -669,7 +669,7 @@ try {
     // ── assertions (JS still works fine for these) ──────────────────────────
     final js = _jsBuilder.build(action);
     final result = await evaluateJs(js);
-    dev.log('Assert ${action.type.name} → $result', name: 'SymUITest');
+    dev.log('Assert ${action.type.name} → $result', name: 'MoraTests');
 
     if (action.type == ActionType.assert_text ||
         action.type == ActionType.assert_url ||

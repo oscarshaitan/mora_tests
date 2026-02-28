@@ -1,4 +1,4 @@
-name: sym_ui_test
+name: mora_tests
 description: "AI-powered UI test runner using Qwen 2.5 VL and embedded WebView"
 publish_to: 'none'
 

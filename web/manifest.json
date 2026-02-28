@@ -1,6 +1,6 @@
 {
-    "name": "sym_ui_test",
-    "short_name": "sym_ui_test",
+    "name": "Mora Tests",
+    "short_name": "Mora Tests",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

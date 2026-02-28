@@ -9,20 +9,20 @@ Future<void> main() async {
 
   await windowManager.ensureInitialized();
   await windowManager.setMinimumSize(const Size(1024, 700));
-  await windowManager.setTitle('SymUITest');
+  await windowManager.setTitle('Mora Tests');
 
   await setupInjection();
 
-  runApp(const SymUITestApp());
+  runApp(const MoraTestsApp());
 }
 
-class SymUITestApp extends StatelessWidget {
-  const SymUITestApp({super.key});
+class MoraTestsApp extends StatelessWidget {
+  const MoraTestsApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'SymUITest',
+      title: 'Mora Tests',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(

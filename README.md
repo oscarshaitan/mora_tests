@@ -1,4 +1,4 @@
-# SymUITest
+# Mora Tests
 
 An AI-powered UI test runner built with Flutter Desktop (Windows + macOS).
 
@@ -71,7 +71,7 @@ This configuration is stored permanently at `%APPDATA%\NuGet\NuGet.Config` and o
 To avoid network issues during the Flutter build, you can pre-download the required NuGet packages into the build directory:
 
 ```powershell
-# Run from the project root (sym_ui_test\)
+# Run from the project root (mora_tests\)
 $pkgdir = "build\windows\x64\packages"
 New-Item -ItemType Directory -Force -Path $pkgdir | Out-Null
 

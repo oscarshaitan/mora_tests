@@ -57,10 +57,10 @@ class TestRunner {
     }
 
     final totalSteps = testCase.steps.length;
-    dev.log('═' * 56, name: 'SymUITest');
+    dev.log('═' * 56, name: 'MoraTests');
     dev.log('TEST START: ${testCase.name}  ($totalSteps step${totalSteps == 1 ? '' : 's'})',
-        name: 'SymUITest');
-    dev.log('═' * 56, name: 'SymUITest');
+        name: 'MoraTests');
+    dev.log('═' * 56, name: 'MoraTests');
 
     try {
       // 2. Navigate to start URL using whatever session state exists.
@@ -83,10 +83,10 @@ class TestRunner {
 
         final dur = _formatDuration(result.duration);
         if (result.success) {
-          dev.log('PASS ($dur)', name: 'SymUITest');
+          dev.log('PASS ($dur)', name: 'MoraTests');
         } else {
           final reason = result.errorMessage ?? 'unknown error';
-          dev.log('FAIL ($dur) — $reason', name: 'SymUITest');
+          dev.log('FAIL ($dur) — $reason', name: 'MoraTests');
         }
 
         if (!result.success && stopOnFirstFailure) break;
@@ -108,15 +108,15 @@ class TestRunner {
       // 5. Clean browser state so the next run always starts from a
       //    logged-out baseline: clears cookies, cache, localStorage,
       //    sessionStorage, then reloads to the start URL.
-      dev.log('─' * 56, name: 'SymUITest');
-      dev.log('Cleaning browser state…', name: 'SymUITest');
+      dev.log('─' * 56, name: 'MoraTests');
+      dev.log('Cleaning browser state…', name: 'MoraTests');
       try {
         await webViewService
             .navigate(testCase.startUrl, clean: true)
             .timeout(const Duration(seconds: 40));
-        dev.log('Browser state cleaned ✓', name: 'SymUITest');
+        dev.log('Browser state cleaned ✓', name: 'MoraTests');
       } catch (e) {
-        dev.log('Browser clean failed (non-fatal): $e', name: 'SymUITest');
+        dev.log('Browser clean failed (non-fatal): $e', name: 'MoraTests');
       }
     }
 
@@ -148,8 +148,8 @@ class TestRunner {
     final assertion =
         step.assertion != null ? _interpolate(step.assertion!, variables) : null;
 
-    dev.log('─' * 56, name: 'SymUITest');
-    dev.log('Step $stepNumber/$totalSteps: $instruction', name: 'SymUITest');
+    dev.log('─' * 56, name: 'MoraTests');
+    dev.log('Step $stepNumber/$totalSteps: $instruction', name: 'MoraTests');
 
     String? lastActionName;
     String? lastError;
@@ -172,7 +172,7 @@ class TestRunner {
         lastActionName = action.type.name;
 
         final conf = '${(action.confidence * 100).toStringAsFixed(0)}%';
-        dev.log('LLM: ${_shortenReasoning(action.reasoning)} ($conf)', name: 'SymUITest');
+        dev.log('LLM: ${_shortenReasoning(action.reasoning)} ($conf)', name: 'MoraTests');
 
         if (action.type == ActionType.done) {
           final after = await _safeScreenshot();
@@ -202,7 +202,7 @@ class TestRunner {
         }
 
         // Execute action
-        dev.log(_formatActionLog(action), name: 'SymUITest');
+        dev.log(_formatActionLog(action), name: 'MoraTests');
         await webViewService.executeAction(action);
         await Future.delayed(const Duration(milliseconds: 1200));
 
@@ -235,7 +235,7 @@ class TestRunner {
         final briefError = lastError.split('\n').first.split(': {').first;
         dev.log(
           '  RETRY ${attempt + 1}/${AppConstants.maxRetries} — $briefError',
-          name: 'SymUITest',
+          name: 'MoraTests',
         );
         await Future.delayed(const Duration(seconds: 2));
       }
@@ -267,9 +267,9 @@ class TestRunner {
         step.assertion != null ? _interpolate(step.assertion!, variables) : null;
     final maxSubSteps = step.maxSubSteps!;
 
-    dev.log('─' * 56, name: 'SymUITest');
+    dev.log('─' * 56, name: 'MoraTests');
     dev.log('Step $stepNumber/$totalSteps [Explore, $maxSubSteps sub-steps max]: $instruction',
-        name: 'SymUITest');
+        name: 'MoraTests');
 
     // Capped history: we keep the last 6 entries to bound token usage while
     // still giving the LLM enough context to avoid re-doing completed steps.
@@ -283,7 +283,7 @@ class TestRunner {
         final screenshot = await webViewService.screenshot();
         firstScreenshot ??= screenshot;
 
-        dev.log('  [$sub/$maxSubSteps]', name: 'SymUITest');
+        dev.log('  [$sub/$maxSubSteps]', name: 'MoraTests');
 
         final recentHistory =
             history.length > 6 ? history.sublist(history.length - 6) : history;
@@ -298,7 +298,7 @@ class TestRunner {
 
         final conf = '${(action.confidence * 100).toStringAsFixed(0)}%';
         dev.log('  LLM: ${_shortenReasoning(action.reasoning)} ($conf)',
-            name: 'SymUITest');
+            name: 'MoraTests');
 
         // Goal reached ✓
         if (action.type == ActionType.done) {
@@ -338,7 +338,7 @@ class TestRunner {
         if (_isRepeatAction(action, history)) {
           dev.log(
             '  Repeat action detected — goal achieved',
-            name: 'SymUITest',
+            name: 'MoraTests',
           );
           final after = await _safeScreenshot();
           return StepResult(
@@ -354,7 +354,7 @@ class TestRunner {
         }
 
         // Execute the sub-action
-        dev.log('  ${_formatActionLog(action)}', name: 'SymUITest');
+        dev.log('  ${_formatActionLog(action)}', name: 'MoraTests');
         await webViewService.executeAction(action);
         await Future.delayed(
           const Duration(milliseconds: AppConstants.settleDelayMs),
@@ -368,7 +368,7 @@ class TestRunner {
       } catch (e) {
         // Sub-step errors are non-fatal; log and let the loop continue.
         final brief = e.toString().split('\n').first.split(': {').first;
-        dev.log('  [$sub/$maxSubSteps] error: $brief', name: 'SymUITest');
+        dev.log('  [$sub/$maxSubSteps] error: $brief', name: 'MoraTests');
       }
     }
 

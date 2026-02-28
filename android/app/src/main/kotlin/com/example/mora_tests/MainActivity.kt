@@ -1,4 +1,4 @@
-package com.example.sym_ui_test
+package com.example.mora_tests
 
 import io.flutter.embedding.android.FlutterActivity
 

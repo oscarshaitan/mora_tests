@@ -90,12 +90,12 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "com.example" "\0"
-            VALUE "FileDescription", "sym_ui_test" "\0"
+            VALUE "FileDescription", "mora_tests" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "sym_ui_test" "\0"
+            VALUE "InternalName", "mora_tests" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2026 com.example. All rights reserved." "\0"
-            VALUE "OriginalFilename", "sym_ui_test.exe" "\0"
-            VALUE "ProductName", "sym_ui_test" "\0"
+            VALUE "OriginalFilename", "mora_tests.exe" "\0"
+            VALUE "ProductName", "Mora Tests" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END
