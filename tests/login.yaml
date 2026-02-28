@@ -3,8 +3,9 @@ name: "Login"
 start_url: "https://symtestclone.web.app"
 steps:
   - id: "5d4c5038-65c4-4052-bfe3-fcba0c08f433"
-    instruction: "wait 5 sec"
+    instruction: "wait until a Login Title is visible"
     timeout: 40
+    max_sub_steps: 5
   - id: "f6bc5512-f143-4696-80fe-1e9a00c7348f"
     instruction: "Tap in the Login Title"
     timeout: 30
@@ -17,16 +18,30 @@ steps:
   - id: "b46e4773-cd75-437a-a661-f6aaef8dd930"
     instruction: "write  in the password field Testing123!"
     timeout: 30
-    max_sub_steps: 3
+    max_sub_steps: 4
   - id: "aef8f941-3049-4f08-83d2-078127d708d8"
     instruction: "Tap Login button"
     timeout: 30
   - id: "6eac45ce-5dad-48b1-bcd0-92868b55881f"
-    instruction: "wait 5 sec"
+    instruction: "wait 3 sec"
     timeout: 30
   - id: "06368c65-0c3d-4a35-8493-c76b074fc2f9"
     instruction: "Navigate to the SmarNote Feed"
     hint: "Use the left navigation panel"
-    assert: "Shoudl be able to see the Add SmartNote FAB button"
+    assert: "Should be able to see the Add SmartNote FAB button"
     timeout: 30
-    max_sub_steps: 3
+    max_sub_steps: 5
+  - id: "4d1d1aa1-8f12-4106-bb40-b732ea78fda2"
+    instruction: "open the Add SmartNote Flow by appign in the \"Add SmartNote\" FAB"
+    assert: "a Dialog is oppened"
+    timeout: 30
+  - id: "c3afc8ae-ceaf-450c-b7cf-fd11e002146d"
+    instruction: |-
+      Fill the Add SmarNote Dialog filling as mush as possible.
+      the bare minimun is adding the note of the SmartNote, the "Whats is your update about?" is a textfield where the note needs to be added.(make clear that is a test)
+      also make sure is a Red SmartNote.
+      try to add some attachment usign the button "Link it..." inside that there are a set of buttons each is a different type of attachemnt try to add one of each
+      then send it  by pressign the Pos it button, if not enable check the previous steps
+    assert: "a loadign should appear, then a green flushbar and few secodns later a new note shoudl be visible in the feed"
+    timeout: 30
+    max_sub_steps: 50

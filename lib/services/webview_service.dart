@@ -98,7 +98,6 @@ class WebViewService {
       final v = await _ctrl.evaluateJavascript(source: 'window.devicePixelRatio');
       if (v is num && v > 0) {
         _dpr = v.toDouble();
-        dev.log('DPR = $_dpr', name: 'SymUITest');
       }
     } catch (_) {}
   }
@@ -209,8 +208,7 @@ class WebViewService {
 })()''';
 
     try {
-      final result = await _ctrl.evaluateJavascript(source: js);
-      dev.log('JS click → $result', name: 'SymUITest');
+      await _ctrl.evaluateJavascript(source: js);
     } catch (e) {
       dev.log('JS click failed: $e', name: 'SymUITest');
     }
@@ -414,8 +412,6 @@ class WebViewService {
   /// In-test `navigate` actions always use [clean]=false (the default).
   Future<void> navigate(String url, {bool clean = false}) async {
     if (clean) {
-      dev.log('Clean navigate → $url', name: 'SymUITest');
-
       // Step 1 — global clears (work from any origin / any page).
       try { await CookieManager.instance().deleteAllCookies(); } catch (_) {}
       try { await InAppWebViewController.clearAllCache(); } catch (_) {}
@@ -432,14 +428,55 @@ class WebViewService {
 
     if (clean) {
       // Step 2 — storage clear: we are now on the correct origin.
-      // localStorage/sessionStorage are scoped to the page origin, so this
-      // must happen after the first load, not from about:blank.
+      // Uses callAsyncJavaScript so we can properly await IndexedDB operations.
+      //
+      // Clears (in order):
+      //  a) localStorage + sessionStorage  (sync, fastest)
+      //  b) Non-HttpOnly cookies via JS    (belt-and-suspenders on top of
+      //                                    CookieManager.deleteAllCookies)
+      //  c) IndexedDB databases            (Firebase Auth stores tokens here —
+      //                                    this is the most common cause of
+      //                                    "still logged in" after cleanup)
+      //  d) Service worker registrations   (may cache auth responses)
       try {
-        await _ctrl.evaluateJavascript(source: '''
-(function(){
-  try { window.localStorage.clear();   } catch(e) {}
-  try { window.sessionStorage.clear(); } catch(e) {}
-})()''');
+        await _ctrl.callAsyncJavaScript(functionBody: r'''
+try { window.localStorage.clear(); } catch(e) {}
+try { window.sessionStorage.clear(); } catch(e) {}
+
+// Clear JS-accessible (non-HttpOnly) cookies
+try {
+  document.cookie.split(';').forEach(function(c) {
+    var k = c.split('=')[0].trim();
+    if (!k) return;
+    document.cookie = k + '=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;';
+    document.cookie = k + '=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;domain='
+                      + location.hostname + ';';
+  });
+} catch(e) {}
+
+// Delete all IndexedDB databases (Firebase Auth, PouchDB, etc.)
+try {
+  if (window.indexedDB && window.indexedDB.databases) {
+    var dbs = await window.indexedDB.databases();
+    await Promise.all(dbs.map(function(db) {
+      return new Promise(function(resolve) {
+        var req = window.indexedDB.deleteDatabase(db.name);
+        req.onsuccess = resolve;
+        req.onerror   = resolve;
+        req.onblocked = resolve;
+      });
+    }));
+  }
+} catch(e) {}
+
+// Unregister all service workers (may cache authenticated API responses)
+try {
+  if (navigator.serviceWorker) {
+    var regs = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(regs.map(function(r) { return r.unregister(); }));
+  }
+} catch(e) {}
+''').timeout(const Duration(seconds: 8), onTimeout: () => null);
       } catch (_) {}
 
       // Step 3 — reload: the app now boots with empty storage and no cookies.
