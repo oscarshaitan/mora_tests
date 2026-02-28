@@ -1,0 +1,22 @@
+id: "ce30d85d-ef92-4ae3-969b-58be36ef5db0"
+name: "Login"
+start_url: "https://symtestclone.web.app"
+steps:
+  - id: "5d4c5038-65c4-4052-bfe3-fcba0c08f433"
+    instruction: "wait 5 sec"
+    timeout: 40
+  - id: "f6bc5512-f143-4696-80fe-1e9a00c7348f"
+    instruction: "Tap in the Login Title"
+    timeout: 30
+  - id: "ac2926cf-3eb4-4b40-b732-77d467e932ba"
+    instruction: "write in the email field  oscar@symterra.co.uk"
+    timeout: 30
+  - id: "72dcfa4b-0b8d-4c2e-af2c-df30a8ab9a5f"
+    instruction: "Tap Next button"
+    timeout: 30
+  - id: "b46e4773-cd75-437a-a661-f6aaef8dd930"
+    instruction: "write  in the password field Testing123!"
+    timeout: 30
+  - id: "aef8f941-3049-4f08-83d2-078127d708d8"
+    instruction: "Tap Next button"
+    timeout: 30

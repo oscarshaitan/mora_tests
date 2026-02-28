@@ -1,0 +1,51 @@
+name: sym_ui_test
+description: "AI-powered UI test runner using Qwen 2.5 VL and embedded WebView"
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.10.4
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+
+  # State management
+  flutter_bloc: ^9.1.1
+  get_it: ^8.0.3
+
+  # Code generation annotations
+  freezed_annotation: ^3.1.0
+  json_annotation: ^4.9.0
+
+  # Embedded WebView (browser automation via JS injection)
+  flutter_inappwebview: ^6.1.5
+
+  # HTTP client
+  http: ^1.4.0
+
+  # YAML parsing/writing
+  yaml: ^3.1.2
+  yaml_writer: ^2.0.0
+
+  # Utilities
+  uuid: ^4.5.1
+  file_picker: ^8.3.7
+  path_provider: ^2.1.5
+  path: ^1.9.1
+  shared_preferences: ^2.3.5
+  window_manager: ^0.4.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  build_runner: ^2.4.15
+  freezed: ^3.2.5
+  json_serializable: ^6.9.5
+
+flutter:
+  uses-material-design: true
