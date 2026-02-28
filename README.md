@@ -2,7 +2,7 @@
 
 An AI-powered UI test runner built with Flutter Desktop (Windows + macOS).
 
-Tests are described in natural language YAML files. For each step, the app takes a screenshot of an embedded WebView, sends it to **Qwen 2.5 VL 72B** (OVH AI Endpoints), and executes the LLM's returned action via JavaScript injection.
+Tests are described in natural language YAML files. For each step the app takes a screenshot of an embedded WebView, sends it to **Qwen 2.5 VL 72B** (OVH AI Endpoints), and executes the LLM's returned action via **CDP (Chrome DevTools Protocol)** events and JavaScript injection.
 
 ---
 
@@ -169,13 +169,14 @@ variables:
   password: "testpass123"
 
 steps:
+  # Standard step — one LLM call, one action
   - id: "step-001"
-    instruction: "Type the username into the email input field"
+    instruction: "Type {{username}} into the email input field"
     hint: "The field has placeholder 'Email address' and is the first input on the page"
     timeout: 15
 
   - id: "step-002"
-    instruction: "Type the password into the password field"
+    instruction: "Type {{password}} into the password field"
     timeout: 15
 
   - id: "step-003"
@@ -183,7 +184,14 @@ steps:
     hint: "Look for a blue button at the bottom of the form that says 'Sign In' or 'Login'"
     timeout: 20
 
+  # Explore step — LLM loops up to max_sub_steps times until it returns "done"
   - id: "step-004"
+    instruction: "Navigate to the Companies section and open the Symterra account"
+    max_sub_steps: 8
+    timeout: 60
+
+  # Standard step with assertion
+  - id: "step-005"
     instruction: "Verify the dashboard loaded successfully"
     assert: "URL should contain /dashboard and a welcome banner should be visible"
     timeout: 30
@@ -197,12 +205,61 @@ steps:
 | `name` | Yes | Display name for the test |
 | `start_url` | Yes | URL the WebView navigates to before step 1 |
 | `seeder` | No | HTTP call made before the test runs |
-| `teardown` | No | HTTP call made after the test finishes |
+| `teardown` | No | HTTP call made after the test finishes (always, even on failure) |
 | `variables` | No | Key-value pairs; use `{{key}}` in instructions |
 | `steps[].instruction` | Yes | Natural language description of what to do |
-| `steps[].hint` | No | Extra guidance for the LLM (e.g. CSS selector hints, visual description) |
-| `steps[].assert` | No | Assertion the LLM should verify |
+| `steps[].hint` | No | Extra guidance for the LLM (e.g. visual description, CSS selector hints) |
+| `steps[].assert` | No | Assertion the LLM should verify after acting |
 | `steps[].timeout` | No | Seconds to wait (default: 30) |
+| `steps[].max_sub_steps` | No | Enables **Explore mode** — LLM loops up to this many times to reach the goal |
+
+---
+
+## Explore Mode
+
+When a step has `max_sub_steps` set, the runner enters a multi-turn loop:
+
+1. Take a screenshot of the current state
+2. Call the LLM with the instruction **plus the full history** of actions already taken
+3. Execute the returned action and record it as a factual, past-tense history entry
+4. Repeat until the LLM returns `done` (success), `fail` (failure), or the sub-step budget is exhausted
+
+Use explore mode for multi-step flows where the exact number of actions is not known in advance — navigating through menus, filling multi-page forms, or completing any workflow that requires the LLM to reason about intermediate state.
+
+**Repeat-type guard:** if the LLM proposes typing the same value that already appears in history, the step immediately succeeds. This handles password fields (which show only dots after typing) and other inputs where visual confirmation is unavailable.
+
+---
+
+## How It Works
+
+```
+For each test step:
+  1. Take WebView screenshot (PNG)
+  2. Send screenshot + instruction + hint → Qwen 2.5 VL 72B (OVH)
+  3. LLM returns JSON: { "action": "click", "x": 378, "y": 400, ... }
+  4. Execute action:
+       - click / doubleClick / longPress → JS PointerEvent sequence (synchronous,
+         avoids OS-focus issues with embedded WebView2)
+       - type  → CDP Input.insertText (after click-to-focus + field clear)
+       - pressKey → CDP Input.dispatchKeyEvent
+       - scroll → CDP mouseWheel + JS window.scrollBy (belt-and-suspenders)
+       - assert_* → JavaScript (returns true/false)
+  5. Wait for page to settle, take "after" screenshot
+  6. On failure: retry up to 2× with error context fed back to the LLM
+```
+
+**Supported actions:** `click`, `doubleClick`, `longPress`, `type`, `scroll`, `navigate`, `wait`, `hover`, `pressKey`, `selectOption`, `assert_text`, `assert_url`, `assert_visible`, `done`, `fail`
+
+### Session cleanup
+
+After every test run (pass, fail, or abort) the browser state is fully wiped before the next test:
+
+1. Cookies and HTTP cache cleared globally via `CookieManager` and `clearAllCache`
+2. Navigate to the start URL so JS runs on the correct origin
+3. `localStorage`, `sessionStorage`, JS-accessible cookies, all **IndexedDB** databases (where Firebase Auth stores tokens), and all **service worker** registrations are deleted via `callAsyncJavaScript`
+4. Page reloaded so the app boots with completely empty storage
+
+This guarantees every test starts from a logged-out baseline regardless of what the previous test did.
 
 ---
 
@@ -224,11 +281,11 @@ lib/
 │   ├── test_run.dart
 │   └── app_settings.dart
 ├── services/
-│   ├── webview_service.dart    # screenshot + JS injection
-│   ├── js_builder.dart         # generates JS per action type
+│   ├── webview_service.dart    # CDP + JS action execution, screenshot, session cleanup
+│   ├── js_builder.dart         # generates JS for assert_* actions
 │   ├── llm_service.dart        # OVH Qwen vision API
 │   ├── http_hook_service.dart  # seeder / teardown HTTP calls
-│   ├── test_runner.dart        # orchestration loop
+│   ├── test_runner.dart        # orchestration loop (standard + explore mode)
 │   └── storage_service.dart    # YAML load/save
 ├── cubits/
 │   ├── builder/
@@ -251,22 +308,6 @@ lib/
     ├── test_case_tile.dart
     └── folder_picker_bar.dart
 ```
-
----
-
-## How It Works
-
-```
-For each test step:
-  1. Take WebView screenshot (PNG)
-  2. Send screenshot + instruction + hint → Qwen 2.5 VL 72B (OVH)
-  3. LLM returns JSON: { "type": "click", "cssSelector": "button.submit", ... }
-  4. Flutter executes action via JavaScript injection into WebView
-  5. Wait for page to settle, take "after" screenshot
-  6. On failure: retry up to 2× with error context
-```
-
-**Supported actions:** `click`, `doubleClick`, `type`, `scroll`, `navigate`, `wait`, `hover`, `pressKey`, `selectOption`, `assert_text`, `assert_url`, `assert_visible`, `done`, `fail`
 
 ---
 
@@ -301,4 +342,8 @@ dart run build_runner build --delete-conflicting-outputs
 
 ### Screenshots are black or empty
 
-WebView2 may need a moment to render. The app retries `takeScreenshot()` once after 500ms automatically. If screenshots remain blank, ensure `domStorageEnabled: true` and `javaScriptEnabled: true` are set in `InAppWebViewSettings`.
+WebView2 may need a moment to render. The app retries `takeScreenshot()` once after 500 ms automatically. If screenshots remain blank, ensure `domStorageEnabled: true` and `javaScriptEnabled: true` are set in `InAppWebViewSettings`.
+
+### Test starts already logged in
+
+The session cleanup runs in the `finally` block so it always executes, but it has an 8-second internal timeout and a 40-second outer timeout. If you see a test start in a logged-in state, check the logs for `Browser clean failed` — a slow IndexedDB or service-worker teardown may have timed out. Re-running the suite should resolve it on the next cycle.
