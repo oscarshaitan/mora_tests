@@ -11,6 +11,7 @@ abstract class AppSettings with _$AppSettings {
     @Default(AppConstants.defaultLlmBaseUrl) String llmBaseUrl,
     @Default('') String llmApiKey,
     @Default(AppConstants.defaultLlmModel) String llmModel,
+    @Default(AppConstants.mistralModel) String llmFallbackModel,
     @Default(false) bool browserHeadless,
     @Default(0.5) double confidenceThreshold,
   }) = _AppSettings;

@@ -37,11 +37,11 @@ steps:
     timeout: 30
   - id: "c3afc8ae-ceaf-450c-b7cf-fd11e002146d"
     instruction: |-
-      Fill the Add SmarNote Dialog filling as mush as possible.
-      the bare minimun is adding the note of the SmartNote, the "Whats is your update about?" is a textfield where the note needs to be added.(make clear that is a test)
-      also make sure is a Red SmartNote.
-      try to add some attachment usign the button "Link it..." inside that there are a set of buttons each is a different type of attachemnt try to add one of each
-      then send it  by pressign the Pos it button, if not enable check the previous steps
-    assert: "a loadign should appear, then a green flushbar and few secodns later a new note shoudl be visible in the feed"
+      The "Whats is your update about?" is a textfield type a note (This is a test note you can Ignore it {{Date.now()}}) the date of the testing (11/11/25) dd/MM/yy format.
+      Make the note Amber.
+      Try to add some attachment usign the button "Link it..."(do not mix the Linkit... button with teh add photo button) inside that there are a set of buttons each is a different type of attachemnt try to add one of each
+      Then send it  by pressign the Pos it button, if not enable check the previous steps.
+    hint: "if the Post button is gray somethign went wrong"
+    assert: "Post Button should be purple and enable"
     timeout: 30
     max_sub_steps: 50

@@ -60,6 +60,11 @@ class TestRunner {
     dev.log('═' * 56, name: 'MoraTests');
     dev.log('TEST START: ${testCase.name}  ($totalSteps step${totalSteps == 1 ? '' : 's'})',
         name: 'MoraTests');
+    final fallbackLabel = llmService.fallbackModel?.isNotEmpty == true
+        ? llmService.fallbackModel!
+        : 'none';
+    dev.log('Model: ${llmService.model}  |  Fallback: $fallbackLabel',
+        name: 'MoraTests');
     dev.log('═' * 56, name: 'MoraTests');
 
     try {
@@ -159,7 +164,7 @@ class TestRunner {
         // Screenshot before
         final screenshotBefore = await webViewService.screenshot();
 
-        // Ask LLM
+        // Ask LLM — honour the per-step timeout defined in the YAML
         final action = await llmService.interpretStep(
           instruction: instruction,
           screenshot: screenshotBefore,
@@ -167,6 +172,11 @@ class TestRunner {
           assertion: assertion,
           previousActionName: lastActionName,
           previousError: lastError,
+        ).timeout(
+          Duration(seconds: step.timeoutSeconds),
+          onTimeout: () => throw TimeoutException(
+            'Step timed out after ${step.timeoutSeconds}s',
+          ),
         );
 
         lastActionName = action.type.name;
@@ -189,11 +199,13 @@ class TestRunner {
         }
 
         if (action.type == ActionType.fail) {
+          final after = await _safeScreenshot();
           return StepResult(
             stepId: step.id,
             success: false,
             actionTaken: action,
             screenshotBefore: screenshotBefore,
+            screenshotAfter: after,
             errorMessage: 'LLM reported failure: ${action.reasoning}',
             rawLlmResponse: action.reasoning,
             duration: stopwatch.elapsed,
@@ -204,7 +216,9 @@ class TestRunner {
         // Execute action
         dev.log(_formatActionLog(action), name: 'MoraTests');
         await webViewService.executeAction(action);
-        await Future.delayed(const Duration(milliseconds: 1200));
+        await Future.delayed(
+          const Duration(milliseconds: AppConstants.postActionDelayMs),
+        );
 
         // Screenshot after
         final screenshotAfter = await _safeScreenshot();
@@ -227,6 +241,7 @@ class TestRunner {
             stepId: step.id,
             success: false,
             screenshotBefore: fallback ?? _emptyPng(),
+            screenshotAfter: fallback,
             errorMessage: lastError,
             duration: stopwatch.elapsed,
             executedAt: DateTime.now(),
@@ -285,8 +300,9 @@ class TestRunner {
 
         dev.log('  [$sub/$maxSubSteps]', name: 'MoraTests');
 
-        final recentHistory =
-            history.length > 6 ? history.sublist(history.length - 6) : history;
+        final recentHistory = history.length > AppConstants.exploreHistorySize
+            ? history.sublist(history.length - AppConstants.exploreHistorySize)
+            : history;
 
         final action = await llmService.interpretStep(
           instruction: instruction,
@@ -294,6 +310,11 @@ class TestRunner {
           hint: hint,
           assertion: assertion,
           subHistory: recentHistory.isEmpty ? null : recentHistory,
+        ).timeout(
+          Duration(seconds: step.timeoutSeconds),
+          onTimeout: () => throw TimeoutException(
+            'Sub-step timed out after ${step.timeoutSeconds}s',
+          ),
         );
 
         final conf = '${(action.confidence * 100).toStringAsFixed(0)}%';
@@ -317,11 +338,13 @@ class TestRunner {
 
         // LLM gave up ✗
         if (action.type == ActionType.fail) {
+          final after = await _safeScreenshot();
           return StepResult(
             stepId: step.id,
             success: false,
             actionTaken: action,
             screenshotBefore: screenshot,
+            screenshotAfter: after,
             errorMessage: 'Explore: LLM reported failure: ${action.reasoning}',
             rawLlmResponse: action.reasoning,
             duration: stopwatch.elapsed,
@@ -422,6 +445,12 @@ class TestRunner {
     var result = text;
     for (final entry in variables.entries) {
       result = result.replaceAll('{{${entry.key}}}', entry.value);
+    }
+    // Warn if any {{placeholder}} was not resolved — common YAML authoring error.
+    final unresolved = RegExp(r'\{\{[^}]+\}\}').allMatches(result);
+    if (unresolved.isNotEmpty) {
+      final keys = unresolved.map((m) => m.group(0)).join(', ');
+      dev.log('WARNING: unresolved variable(s) in step: $keys', name: 'MoraTests');
     }
     return result;
   }

@@ -48,6 +48,7 @@ Future<void> setupInjection() async {
       baseUrl: s.llmBaseUrl,
       apiKey: s.llmApiKey,
       model: s.llmModel,
+      fallbackModel: s.llmFallbackModel,
     );
   });
 
@@ -62,5 +63,6 @@ void refreshLlmService(AppSettings settings) {
         baseUrl: settings.llmBaseUrl,
         apiKey: settings.llmApiKey,
         model: settings.llmModel,
+        fallbackModel: settings.llmFallbackModel,
       ));
 }

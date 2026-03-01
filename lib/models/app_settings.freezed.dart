@@ -15,7 +15,7 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$AppSettings {
 
- String get llmBaseUrl; String get llmApiKey; String get llmModel; bool get browserHeadless; double get confidenceThreshold;
+ String get llmBaseUrl; String get llmApiKey; String get llmModel; String get llmFallbackModel; bool get browserHeadless; double get confidenceThreshold;
 /// Create a copy of AppSettings
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -28,16 +28,16 @@ $AppSettingsCopyWith<AppSettings> get copyWith => _$AppSettingsCopyWithImpl<AppS
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is AppSettings&&(identical(other.llmBaseUrl, llmBaseUrl) || other.llmBaseUrl == llmBaseUrl)&&(identical(other.llmApiKey, llmApiKey) || other.llmApiKey == llmApiKey)&&(identical(other.llmModel, llmModel) || other.llmModel == llmModel)&&(identical(other.browserHeadless, browserHeadless) || other.browserHeadless == browserHeadless)&&(identical(other.confidenceThreshold, confidenceThreshold) || other.confidenceThreshold == confidenceThreshold));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is AppSettings&&(identical(other.llmBaseUrl, llmBaseUrl) || other.llmBaseUrl == llmBaseUrl)&&(identical(other.llmApiKey, llmApiKey) || other.llmApiKey == llmApiKey)&&(identical(other.llmModel, llmModel) || other.llmModel == llmModel)&&(identical(other.llmFallbackModel, llmFallbackModel) || other.llmFallbackModel == llmFallbackModel)&&(identical(other.browserHeadless, browserHeadless) || other.browserHeadless == browserHeadless)&&(identical(other.confidenceThreshold, confidenceThreshold) || other.confidenceThreshold == confidenceThreshold));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,llmBaseUrl,llmApiKey,llmModel,browserHeadless,confidenceThreshold);
+int get hashCode => Object.hash(runtimeType,llmBaseUrl,llmApiKey,llmModel,llmFallbackModel,browserHeadless,confidenceThreshold);
 
 @override
 String toString() {
-  return 'AppSettings(llmBaseUrl: $llmBaseUrl, llmApiKey: $llmApiKey, llmModel: $llmModel, browserHeadless: $browserHeadless, confidenceThreshold: $confidenceThreshold)';
+  return 'AppSettings(llmBaseUrl: $llmBaseUrl, llmApiKey: $llmApiKey, llmModel: $llmModel, llmFallbackModel: $llmFallbackModel, browserHeadless: $browserHeadless, confidenceThreshold: $confidenceThreshold)';
 }
 
 
@@ -48,7 +48,7 @@ abstract mixin class $AppSettingsCopyWith<$Res>  {
   factory $AppSettingsCopyWith(AppSettings value, $Res Function(AppSettings) _then) = _$AppSettingsCopyWithImpl;
 @useResult
 $Res call({
- String llmBaseUrl, String llmApiKey, String llmModel, bool browserHeadless, double confidenceThreshold
+ String llmBaseUrl, String llmApiKey, String llmModel, String llmFallbackModel, bool browserHeadless, double confidenceThreshold
 });
 
 
@@ -65,11 +65,12 @@ class _$AppSettingsCopyWithImpl<$Res>
 
 /// Create a copy of AppSettings
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? llmBaseUrl = null,Object? llmApiKey = null,Object? llmModel = null,Object? browserHeadless = null,Object? confidenceThreshold = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? llmBaseUrl = null,Object? llmApiKey = null,Object? llmModel = null,Object? llmFallbackModel = null,Object? browserHeadless = null,Object? confidenceThreshold = null,}) {
   return _then(_self.copyWith(
 llmBaseUrl: null == llmBaseUrl ? _self.llmBaseUrl : llmBaseUrl // ignore: cast_nullable_to_non_nullable
 as String,llmApiKey: null == llmApiKey ? _self.llmApiKey : llmApiKey // ignore: cast_nullable_to_non_nullable
 as String,llmModel: null == llmModel ? _self.llmModel : llmModel // ignore: cast_nullable_to_non_nullable
+as String,llmFallbackModel: null == llmFallbackModel ? _self.llmFallbackModel : llmFallbackModel // ignore: cast_nullable_to_non_nullable
 as String,browserHeadless: null == browserHeadless ? _self.browserHeadless : browserHeadless // ignore: cast_nullable_to_non_nullable
 as bool,confidenceThreshold: null == confidenceThreshold ? _self.confidenceThreshold : confidenceThreshold // ignore: cast_nullable_to_non_nullable
 as double,
@@ -157,10 +158,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String llmBaseUrl,  String llmApiKey,  String llmModel,  bool browserHeadless,  double confidenceThreshold)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String llmBaseUrl,  String llmApiKey,  String llmModel,  String llmFallbackModel,  bool browserHeadless,  double confidenceThreshold)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _AppSettings() when $default != null:
-return $default(_that.llmBaseUrl,_that.llmApiKey,_that.llmModel,_that.browserHeadless,_that.confidenceThreshold);case _:
+return $default(_that.llmBaseUrl,_that.llmApiKey,_that.llmModel,_that.llmFallbackModel,_that.browserHeadless,_that.confidenceThreshold);case _:
   return orElse();
 
 }
@@ -178,10 +179,10 @@ return $default(_that.llmBaseUrl,_that.llmApiKey,_that.llmModel,_that.browserHea
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String llmBaseUrl,  String llmApiKey,  String llmModel,  bool browserHeadless,  double confidenceThreshold)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String llmBaseUrl,  String llmApiKey,  String llmModel,  String llmFallbackModel,  bool browserHeadless,  double confidenceThreshold)  $default,) {final _that = this;
 switch (_that) {
 case _AppSettings():
-return $default(_that.llmBaseUrl,_that.llmApiKey,_that.llmModel,_that.browserHeadless,_that.confidenceThreshold);case _:
+return $default(_that.llmBaseUrl,_that.llmApiKey,_that.llmModel,_that.llmFallbackModel,_that.browserHeadless,_that.confidenceThreshold);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -198,10 +199,10 @@ return $default(_that.llmBaseUrl,_that.llmApiKey,_that.llmModel,_that.browserHea
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String llmBaseUrl,  String llmApiKey,  String llmModel,  bool browserHeadless,  double confidenceThreshold)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String llmBaseUrl,  String llmApiKey,  String llmModel,  String llmFallbackModel,  bool browserHeadless,  double confidenceThreshold)?  $default,) {final _that = this;
 switch (_that) {
 case _AppSettings() when $default != null:
-return $default(_that.llmBaseUrl,_that.llmApiKey,_that.llmModel,_that.browserHeadless,_that.confidenceThreshold);case _:
+return $default(_that.llmBaseUrl,_that.llmApiKey,_that.llmModel,_that.llmFallbackModel,_that.browserHeadless,_that.confidenceThreshold);case _:
   return null;
 
 }
@@ -213,12 +214,13 @@ return $default(_that.llmBaseUrl,_that.llmApiKey,_that.llmModel,_that.browserHea
 @JsonSerializable()
 
 class _AppSettings implements AppSettings {
-  const _AppSettings({this.llmBaseUrl = AppConstants.defaultLlmBaseUrl, this.llmApiKey = '', this.llmModel = AppConstants.defaultLlmModel, this.browserHeadless = false, this.confidenceThreshold = 0.5});
+  const _AppSettings({this.llmBaseUrl = AppConstants.defaultLlmBaseUrl, this.llmApiKey = '', this.llmModel = AppConstants.defaultLlmModel, this.llmFallbackModel = AppConstants.mistralModel, this.browserHeadless = false, this.confidenceThreshold = 0.5});
   factory _AppSettings.fromJson(Map<String, dynamic> json) => _$AppSettingsFromJson(json);
 
 @override@JsonKey() final  String llmBaseUrl;
 @override@JsonKey() final  String llmApiKey;
 @override@JsonKey() final  String llmModel;
+@override@JsonKey() final  String llmFallbackModel;
 @override@JsonKey() final  bool browserHeadless;
 @override@JsonKey() final  double confidenceThreshold;
 
@@ -235,16 +237,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _AppSettings&&(identical(other.llmBaseUrl, llmBaseUrl) || other.llmBaseUrl == llmBaseUrl)&&(identical(other.llmApiKey, llmApiKey) || other.llmApiKey == llmApiKey)&&(identical(other.llmModel, llmModel) || other.llmModel == llmModel)&&(identical(other.browserHeadless, browserHeadless) || other.browserHeadless == browserHeadless)&&(identical(other.confidenceThreshold, confidenceThreshold) || other.confidenceThreshold == confidenceThreshold));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _AppSettings&&(identical(other.llmBaseUrl, llmBaseUrl) || other.llmBaseUrl == llmBaseUrl)&&(identical(other.llmApiKey, llmApiKey) || other.llmApiKey == llmApiKey)&&(identical(other.llmModel, llmModel) || other.llmModel == llmModel)&&(identical(other.llmFallbackModel, llmFallbackModel) || other.llmFallbackModel == llmFallbackModel)&&(identical(other.browserHeadless, browserHeadless) || other.browserHeadless == browserHeadless)&&(identical(other.confidenceThreshold, confidenceThreshold) || other.confidenceThreshold == confidenceThreshold));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,llmBaseUrl,llmApiKey,llmModel,browserHeadless,confidenceThreshold);
+int get hashCode => Object.hash(runtimeType,llmBaseUrl,llmApiKey,llmModel,llmFallbackModel,browserHeadless,confidenceThreshold);
 
 @override
 String toString() {
-  return 'AppSettings(llmBaseUrl: $llmBaseUrl, llmApiKey: $llmApiKey, llmModel: $llmModel, browserHeadless: $browserHeadless, confidenceThreshold: $confidenceThreshold)';
+  return 'AppSettings(llmBaseUrl: $llmBaseUrl, llmApiKey: $llmApiKey, llmModel: $llmModel, llmFallbackModel: $llmFallbackModel, browserHeadless: $browserHeadless, confidenceThreshold: $confidenceThreshold)';
 }
 
 
@@ -255,7 +257,7 @@ abstract mixin class _$AppSettingsCopyWith<$Res> implements $AppSettingsCopyWith
   factory _$AppSettingsCopyWith(_AppSettings value, $Res Function(_AppSettings) _then) = __$AppSettingsCopyWithImpl;
 @override @useResult
 $Res call({
- String llmBaseUrl, String llmApiKey, String llmModel, bool browserHeadless, double confidenceThreshold
+ String llmBaseUrl, String llmApiKey, String llmModel, String llmFallbackModel, bool browserHeadless, double confidenceThreshold
 });
 
 
@@ -272,11 +274,12 @@ class __$AppSettingsCopyWithImpl<$Res>
 
 /// Create a copy of AppSettings
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? llmBaseUrl = null,Object? llmApiKey = null,Object? llmModel = null,Object? browserHeadless = null,Object? confidenceThreshold = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? llmBaseUrl = null,Object? llmApiKey = null,Object? llmModel = null,Object? llmFallbackModel = null,Object? browserHeadless = null,Object? confidenceThreshold = null,}) {
   return _then(_AppSettings(
 llmBaseUrl: null == llmBaseUrl ? _self.llmBaseUrl : llmBaseUrl // ignore: cast_nullable_to_non_nullable
 as String,llmApiKey: null == llmApiKey ? _self.llmApiKey : llmApiKey // ignore: cast_nullable_to_non_nullable
 as String,llmModel: null == llmModel ? _self.llmModel : llmModel // ignore: cast_nullable_to_non_nullable
+as String,llmFallbackModel: null == llmFallbackModel ? _self.llmFallbackModel : llmFallbackModel // ignore: cast_nullable_to_non_nullable
 as String,browserHeadless: null == browserHeadless ? _self.browserHeadless : browserHeadless // ignore: cast_nullable_to_non_nullable
 as bool,confidenceThreshold: null == confidenceThreshold ? _self.confidenceThreshold : confidenceThreshold // ignore: cast_nullable_to_non_nullable
 as double,

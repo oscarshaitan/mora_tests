@@ -1,8 +1,11 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:developer' as dev;
 import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
+import '../core/constants.dart';
 import '../core/exceptions.dart';
 import '../models/llm_action.dart';
 
@@ -56,7 +59,7 @@ JSON SCHEMA (respond with EXACTLY this shape):
   "wait_ms": <number or null>,
   "expected_text": "<text to assert or null>",
   "expected_url": "<URL pattern to assert or null>",
-  "confidence": 0.95,
+  "confidence": <float 0.0–1.0 reflecting how certain you are>,
   "reasoning": "Brief explanation of what you see and what you are doing"
 }
 ''';
@@ -65,6 +68,7 @@ class LlmService {
   final String baseUrl;
   final String apiKey;
   final String model;
+  final String? fallbackModel;
   final double temperature;
   final int maxTokens;
 
@@ -72,6 +76,7 @@ class LlmService {
     required this.baseUrl,
     required this.apiKey,
     required this.model,
+    this.fallbackModel,
     this.temperature = 0.1,
     this.maxTokens = 512,
   });
@@ -141,22 +146,7 @@ class LlmService {
       'response_format': {'type': 'json_object'},
     };
 
-    final response = await http
-        .post(
-          Uri.parse('$baseUrl/chat/completions'),
-          headers: {
-            'Authorization': 'Bearer $apiKey',
-            'Content-Type': 'application/json',
-          },
-          body: jsonEncode(body),
-        )
-        .timeout(const Duration(seconds: 90));
-
-    if (response.statusCode != 200) {
-      throw LlmException(
-        'API returned ${response.statusCode}: ${response.body}',
-      );
-    }
+    final response = await _tryWithFallback(body);
 
     final data = jsonDecode(response.body) as Map<String, dynamic>;
     final content =
@@ -174,6 +164,75 @@ class LlmService {
           : content;
       throw LlmException('Failed to parse LLM response: $snippet');
     }
+  }
+
+  /// Tries the primary model first. If it throws [LlmException] and a
+  /// [fallbackModel] is configured (and different from [model]), retries
+  /// the exact same request with the fallback model substituted.
+  Future<http.Response> _tryWithFallback(Map<String, dynamic> body) async {
+    try {
+      return await _doRequest(body);
+    } on LlmException {
+      final fb = fallbackModel;
+      if (fb == null || fb.isEmpty || fb == model) rethrow;
+      dev.log(
+        'Primary model "$model" failed — retrying with fallback "$fb"',
+        name: 'LlmService',
+      );
+      final fallbackBody = Map<String, dynamic>.from(body);
+      fallbackBody['model'] = fb;
+      return await _doRequest(fallbackBody);
+    }
+  }
+
+  /// Makes the HTTP request to the LLM API.
+  ///
+  /// Handles HTTP 429 (rate limit) transparently: waits for the duration
+  /// specified in the `Retry-After` response header (or
+  /// [AppConstants.rateLimitDelaySeconds] if the header is absent) then
+  /// retries the request once. Any other non-200 status throws [LlmException].
+  Future<http.Response> _doRequest(Map<String, dynamic> body) async {
+    final headers = {
+      'Authorization': 'Bearer $apiKey',
+      'Content-Type': 'application/json',
+    };
+    final uri = Uri.parse('$baseUrl/chat/completions');
+    final encoded = jsonEncode(body);
+
+    http.Response response;
+    try {
+      response = await http
+          .post(uri, headers: headers, body: encoded)
+          .timeout(const Duration(seconds: 90));
+    } on TimeoutException {
+      throw LlmException('Request timed out after 90 s (model: ${body['model']})');
+    }
+
+    if (response.statusCode == 429) {
+      final retryAfter = int.tryParse(
+            response.headers['retry-after'] ?? '',
+          ) ??
+          AppConstants.rateLimitDelaySeconds;
+      dev.log(
+        'Rate limited (429) — waiting ${retryAfter}s before retry',
+        name: 'LlmService',
+      );
+      await Future.delayed(Duration(seconds: retryAfter));
+      try {
+        response = await http
+            .post(uri, headers: headers, body: encoded)
+            .timeout(const Duration(seconds: 90));
+      } on TimeoutException {
+        throw LlmException('Request timed out after 90 s on 429-retry (model: ${body['model']})');
+      }
+    }
+
+    if (response.statusCode != 200) {
+      throw LlmException(
+        'API returned ${response.statusCode}: ${response.body}',
+      );
+    }
+    return response;
   }
 
   /// Extracts a clean JSON object string from raw LLM output.

@@ -58,6 +58,12 @@ class _IdleView extends StatelessWidget {
                 icon: const Icon(Icons.insert_drive_file_outlined),
                 label: const Text('Open File'),
               ),
+              const SizedBox(width: 12),
+              OutlinedButton.icon(
+                onPressed: cubit.loadHistory,
+                icon: const Icon(Icons.history),
+                label: const Text('History'),
+              ),
             ],
           ),
         ],
@@ -97,6 +103,11 @@ class _ReadyView extends StatelessWidget {
                       icon: const Icon(Icons.insert_drive_file_outlined),
                       tooltip: 'Open file',
                       onPressed: cubit.openFile,
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.history),
+                      tooltip: 'View history',
+                      onPressed: cubit.loadHistory,
                     ),
                     const Spacer(),
                     TextButton(

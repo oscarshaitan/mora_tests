@@ -169,7 +169,10 @@ class RunnerCubit extends Cubit<RunnerState> {
         },
       );
 
-      allRuns.add(run.copyWith(results: completedSteps));
+      final finalRun = run.copyWith(results: completedSteps);
+      allRuns.add(finalRun);
+      // Persist run to disk — non-fatal if it fails
+      await _storage.saveTestRun(finalRun);
     }
 
     emit(RunnerState.finished(
@@ -181,6 +184,29 @@ class RunnerCubit extends Cubit<RunnerState> {
 
   void abort() {
     _runner?.abort();
+  }
+
+  /// Loads all previously saved runs from disk and shows them in the results
+  /// view. Can be called from any state (idle, ready, or finished).
+  Future<void> loadHistory() async {
+    final runs = await _storage.loadSavedRuns();
+    if (runs.isEmpty) return;
+
+    // Preserve testCases/selectedIds if we are in a ready/finished state so
+    // the user can go back to the same test list.
+    final (testCases, selectedIds) = switch (state) {
+      RunnerFinished(:final testCases, :final selectedIds) =>
+        (testCases, selectedIds),
+      RunnerReady(:final testCases, :final selectedIds) =>
+        (testCases, selectedIds),
+      _ => (const <TestCase>[], const <String>[]),
+    };
+
+    emit(RunnerState.finished(
+      runs: runs,
+      testCases: testCases,
+      selectedIds: selectedIds,
+    ));
   }
 
   void backToReady() {

@@ -2,13 +2,17 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 import 'package:yaml/yaml.dart';
 import 'package:yaml_writer/yaml_writer.dart';
 
 import '../core/exceptions.dart';
 import '../models/http_hook.dart';
+import '../models/llm_action.dart';
+import '../models/step_result.dart';
 import '../models/test_case.dart';
+import '../models/test_run.dart';
 import '../models/test_step.dart';
 
 class StorageService {
@@ -166,4 +170,109 @@ class StorageService {
     final json = const JsonEncoder.withIndent('  ').convert(results);
     await File(filePath).writeAsString(json);
   }
+
+  // ── Run persistence ─────────────────────────────────────────────────────────
+
+  Future<Directory> _runsDir() async {
+    final base = await getApplicationSupportDirectory();
+    final dir = Directory(p.join(base.path, 'mora_tests_runs'));
+    if (!await dir.exists()) await dir.create(recursive: true);
+    return dir;
+  }
+
+  /// Saves a completed [TestRun] (including screenshots as base64) to disk.
+  Future<void> saveTestRun(TestRun run) async {
+    try {
+      final dir = await _runsDir();
+      final file = File(p.join(dir.path, '${run.id}.json'));
+      final json = const JsonEncoder.withIndent('  ').convert(_runToJson(run));
+      await file.writeAsString(json);
+    } catch (_) {
+      // Non-fatal — persistence failure should never break a test run
+    }
+  }
+
+  /// Loads all previously saved [TestRun]s, newest first.
+  /// Corrupt or unreadable files are silently skipped.
+  Future<List<TestRun>> loadSavedRuns() async {
+    try {
+      final dir = await _runsDir();
+      final files = await dir
+          .list()
+          .where((e) => e is File && e.path.endsWith('.json'))
+          .cast<File>()
+          .toList();
+
+      final runs = <TestRun>[];
+      for (final file in files) {
+        try {
+          final content = await file.readAsString();
+          final map = jsonDecode(content) as Map<String, dynamic>;
+          runs.add(_runFromJson(map));
+        } catch (_) {
+          // Skip corrupt files
+        }
+      }
+      // Newest first
+      runs.sort((a, b) => b.startedAt.compareTo(a.startedAt));
+      return runs;
+    } catch (_) {
+      return [];
+    }
+  }
+
+  // ── Run serialization ───────────────────────────────────────────────────────
+
+  Map<String, dynamic> _runToJson(TestRun run) => {
+        'id': run.id,
+        'testCaseId': run.testCaseId,
+        'testCaseName': run.testCaseName,
+        'startedAt': run.startedAt.toIso8601String(),
+        'finishedAt': run.finishedAt?.toIso8601String(),
+        'status': run.status.name,
+        'results': run.results.map(_stepResultToJson).toList(),
+      };
+
+  Map<String, dynamic> _stepResultToJson(StepResult r) => {
+        'stepId': r.stepId,
+        'success': r.success,
+        'actionTaken': r.actionTaken?.toJson(),
+        'screenshotBefore': base64Encode(r.screenshotBefore),
+        'screenshotAfter':
+            r.screenshotAfter != null ? base64Encode(r.screenshotAfter!) : null,
+        'errorMessage': r.errorMessage,
+        'rawLlmResponse': r.rawLlmResponse,
+        'durationMs': r.duration.inMilliseconds,
+        'executedAt': r.executedAt.toIso8601String(),
+      };
+
+  TestRun _runFromJson(Map<String, dynamic> m) => TestRun(
+        id: m['id'] as String,
+        testCaseId: m['testCaseId'] as String,
+        testCaseName: m['testCaseName'] as String,
+        startedAt: DateTime.parse(m['startedAt'] as String),
+        finishedAt: m['finishedAt'] != null
+            ? DateTime.parse(m['finishedAt'] as String)
+            : null,
+        status: RunStatus.values.byName(m['status'] as String),
+        results: (m['results'] as List<dynamic>)
+            .map((e) => _stepResultFromJson(e as Map<String, dynamic>))
+            .toList(),
+      );
+
+  StepResult _stepResultFromJson(Map<String, dynamic> m) => StepResult(
+        stepId: m['stepId'] as String,
+        success: m['success'] as bool,
+        actionTaken: m['actionTaken'] != null
+            ? LlmAction.fromJson(m['actionTaken'] as Map<String, dynamic>)
+            : null,
+        screenshotBefore: base64Decode(m['screenshotBefore'] as String),
+        screenshotAfter: m['screenshotAfter'] != null
+            ? base64Decode(m['screenshotAfter'] as String)
+            : null,
+        errorMessage: m['errorMessage'] as String?,
+        rawLlmResponse: m['rawLlmResponse'] as String?,
+        duration: Duration(milliseconds: m['durationMs'] as int),
+        executedAt: DateTime.parse(m['executedAt'] as String),
+      );
 }

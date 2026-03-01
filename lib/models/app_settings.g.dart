@@ -10,6 +10,8 @@ _AppSettings _$AppSettingsFromJson(Map<String, dynamic> json) => _AppSettings(
   llmBaseUrl: json['llmBaseUrl'] as String? ?? AppConstants.defaultLlmBaseUrl,
   llmApiKey: json['llmApiKey'] as String? ?? '',
   llmModel: json['llmModel'] as String? ?? AppConstants.defaultLlmModel,
+  llmFallbackModel:
+      json['llmFallbackModel'] as String? ?? AppConstants.mistralModel,
   browserHeadless: json['browserHeadless'] as bool? ?? false,
   confidenceThreshold: (json['confidenceThreshold'] as num?)?.toDouble() ?? 0.5,
 );
@@ -19,6 +21,7 @@ Map<String, dynamic> _$AppSettingsToJson(_AppSettings instance) =>
       'llmBaseUrl': instance.llmBaseUrl,
       'llmApiKey': instance.llmApiKey,
       'llmModel': instance.llmModel,
+      'llmFallbackModel': instance.llmFallbackModel,
       'browserHeadless': instance.browserHeadless,
       'confidenceThreshold': instance.confidenceThreshold,
     };

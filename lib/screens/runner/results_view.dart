@@ -1,10 +1,15 @@
+import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:path/path.dart' as p;
 
 import '../../cubits/runner/runner_cubit.dart';
 import '../../cubits/runner/runner_state.dart';
 import '../../models/step_result.dart';
 import '../../models/test_run.dart';
+import '../../services/report_service.dart';
 import '../../widgets/screenshot_panel.dart';
 
 class ResultsView extends StatefulWidget {
@@ -36,14 +41,20 @@ class _ResultsViewState extends State<ResultsView> {
             children: [
               Padding(
                 padding: const EdgeInsets.all(8),
-                child: Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: context.read<RunnerCubit>().backToReady,
-                        icon: const Icon(Icons.arrow_back, size: 16),
-                        label: const Text('Back'),
-                      ),
+                    OutlinedButton.icon(
+                      onPressed: context.read<RunnerCubit>().backToReady,
+                      icon: const Icon(Icons.arrow_back, size: 16),
+                      label: const Text('Back'),
+                    ),
+                    const SizedBox(height: 6),
+                    OutlinedButton.icon(
+                      onPressed: () => _exportReport(context, runs),
+                      icon: const Icon(Icons.file_download_outlined, size: 16),
+                      label: Text(
+                          'Export HTML (${runs.length})'),
                     ),
                   ],
                 ),
@@ -93,6 +104,51 @@ class _ResultsViewState extends State<ResultsView> {
     if (d.inSeconds < 60) return '${d.inSeconds}s';
     return '${d.inMinutes}m ${d.inSeconds % 60}s';
   }
+
+  // ── HTML export ────────────────────────────────────────────────────────────
+
+  Future<void> _exportReport(
+      BuildContext context, List<TestRun> runs) async {
+    if (runs.isEmpty) return;
+
+    final now = DateTime.now();
+    final suggested =
+        'mora_report_${now.year}-${_pad(now.month)}-${_pad(now.day)}'
+        '_${_pad(now.hour)}-${_pad(now.minute)}.html';
+
+    final savePath = await FilePicker.platform.saveFile(
+      dialogTitle: 'Save HTML report',
+      fileName: suggested,
+      type: FileType.custom,
+      allowedExtensions: ['html'],
+    );
+    if (savePath == null || !context.mounted) return;
+
+    try {
+      // Image compression is CPU-intensive; run synchronously (fast enough
+      // for typical test suites; isolate can be added later if needed).
+      final html = ReportService.generateHtml(runs);
+      await File(savePath).writeAsString(html);
+
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Report saved: ${p.basename(savePath)}'),
+          action: SnackBarAction(label: 'OK', onPressed: () {}),
+        ),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Export failed: $e'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
+    }
+  }
+
+  String _pad(int n) => n.toString().padLeft(2, '0');
 }
 
 class _RunDetail extends StatelessWidget {
@@ -107,9 +163,7 @@ class _RunDetail extends StatelessWidget {
         // Summary bar
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          color: run.passed
-              ? Colors.green.shade50
-              : Colors.red.shade50,
+          color: run.passed ? Colors.green.shade50 : Colors.red.shade50,
           child: Row(
             children: [
               Icon(
@@ -167,7 +221,7 @@ class _StepResultCardState extends State<_StepResultCard> {
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8),
-        side: BorderSide(color: color.withOpacity(0.5)),
+        side: BorderSide(color: color.withValues(alpha: 0.5)),
       ),
       child: Column(
         children: [
@@ -207,9 +261,8 @@ class _StepResultCardState extends State<_StepResultCard> {
                   style: const TextStyle(fontSize: 11),
                 ),
                 IconButton(
-                  icon: Icon(_expanded
-                      ? Icons.expand_less
-                      : Icons.expand_more),
+                  icon: Icon(
+                      _expanded ? Icons.expand_less : Icons.expand_more),
                   onPressed: () => setState(() => _expanded = !_expanded),
                 ),
               ],
@@ -239,8 +292,7 @@ class _StepResultCardState extends State<_StepResultCard> {
                               const Text('Before',
                                   style: TextStyle(fontSize: 11)),
                               const SizedBox(height: 4),
-                              ScreenshotPanel(
-                                  bytes: result.screenshotBefore),
+                              ScreenshotPanel(bytes: result.screenshotBefore),
                             ],
                           ),
                         ),
