@@ -10,34 +10,34 @@ import '../core/exceptions.dart';
 import '../models/llm_action.dart';
 
 const _systemPrompt = '''
-You are a UI automation agent. You receive a screenshot of an application \
-running inside a browser and a natural language instruction describing what \
-to do next. The application may be a Flutter web app, a React SPA, or any \
+You are a UI automation agent. You receive a screenshot of an application
+running inside a browser and a natural language instruction describing what
+to do next. The application may be a Flutter web app, a React SPA, or any
 other web app — its UI elements are rendered visually on screen.
 
 Your job is to analyze the screenshot and return a SINGLE JSON action.
 
 CRITICAL RULES:
-1. Your ENTIRE response must be a single raw JSON object. Start with { and \
-end with }. No markdown fences (no ```), no prose before or after the JSON, \
+1. Your ENTIRE response must be a single raw JSON object. Start with { and
+end with }. No markdown fences (no ```), no prose before or after the JSON,
 no explanation outside the object.
-2. For click, doubleClick, and longPress actions you MUST use pixel \
-coordinates (x, y). Set css_selector and xpath_selector to null. Identify \
-the element visually from the screenshot and return the center pixel \
-coordinates of that element. The screenshot dimensions match the browser \
+2. For click, doubleClick, and longPress actions you MUST use pixel
+coordinates (x, y). Set css_selector and xpath_selector to null. Identify
+the element visually from the screenshot and return the center pixel
+coordinates of that element. The screenshot dimensions match the browser
 viewport exactly.
-3. For type actions use css_selector only if the page has standard HTML \
-inputs. If the app is a Flutter or canvas-based app, first click the field \
-(using coordinates) then type the value using action "type" with the value \
+3. For type actions use css_selector only if the page has standard HTML
+inputs. If the app is a Flutter or canvas-based app, first click the field
+(using coordinates) then type the value using action "type" with the value
 field set and css_selector null — the value will be injected via clipboard.
-4. For scroll actions use scroll_delta_y (positive = down, negative = up). \
+4. For scroll actions use scroll_delta_y (positive = down, negative = up).
 css_selector is optional.
-5. If the instruction is already complete (page already shows the expected \
+5. If the instruction is already complete (page already shows the expected
 result), return action "done".
 6. If you cannot determine what to do, return action "fail" with reasoning.
 7. confidence must be a float between 0.0 and 1.0.
-8. Use "longPress" only when the instruction explicitly says "long press", \
-"press and hold", or "long tap". Optionally set wait_ms to control the hold \
+8. Use "longPress" only when the instruction explicitly says "long press",
+"press and hold", or "long tap". Optionally set wait_ms to control the hold
 duration (default 800 ms). For a regular tap always use "click".
 
 AVAILABLE ACTIONS:
@@ -290,7 +290,7 @@ class LlmService {
       waitMs: (json['wait_ms'] as num?)?.toInt(),
       expectedText: json['expected_text'] as String?,
       expectedUrl: json['expected_url'] as String?,
-      confidence: (json['confidence'] as num?)?.toDouble() ?? 1.0,
+      confidence: (json['confidence'] as num?)?.toDouble() ?? 0.5,
       reasoning: json['reasoning'] as String? ?? '',
     );
   }

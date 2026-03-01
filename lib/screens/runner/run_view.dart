@@ -27,8 +27,22 @@ class RunView extends StatelessWidget {
               Container(
                 height: 48,
                 padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  color:
+                      Theme.of(context).colorScheme.surfaceContainerLow,
+                  border: Border(
+                    bottom: BorderSide(
+                      color:
+                          Theme.of(context).colorScheme.outlineVariant,
+                    ),
+                  ),
+                ),
                 child: Row(
                   children: [
+                    Icon(Icons.play_circle_outline,
+                        size: 16,
+                        color: Theme.of(context).colorScheme.primary),
+                    const SizedBox(width: 6),
                     Expanded(
                       child: Text(
                         state.currentTest.name,
@@ -38,7 +52,7 @@ class RunView extends StatelessWidget {
                     ),
                     TextButton.icon(
                       onPressed: cubit.abort,
-                      icon: const Icon(Icons.stop, size: 16),
+                      icon: const Icon(Icons.stop_rounded, size: 16),
                       label: const Text('Stop'),
                       style: TextButton.styleFrom(
                         foregroundColor:
@@ -107,43 +121,65 @@ class _ActionDetail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final confidence = state.lastLlmConfidence;
-    final confidenceText =
-        confidence != null ? '${(confidence * 100).toStringAsFixed(0)}%' : '';
+    final pct = confidence != null
+        ? '${(confidence * 100).toStringAsFixed(0)}%'
+        : null;
 
     return Container(
-      padding: const EdgeInsets.all(10),
-      color: Theme.of(context).colorScheme.surfaceContainerLow,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerLow,
+        border: Border(top: BorderSide(color: cs.outlineVariant)),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (state.lastActionName != null)
-            Row(
-              children: [
+          Row(
+            children: [
+              if (state.lastActionName != null) ...[
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.primaryContainer,
+                    color: cs.primaryContainer,
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
                     state.lastActionName!,
-                    style: Theme.of(context).textTheme.labelSmall,
+                    style: Theme.of(context)
+                        .textTheme
+                        .labelSmall
+                        ?.copyWith(color: cs.onPrimaryContainer),
                   ),
                 ),
-                const Spacer(),
-                if (confidenceText.isNotEmpty)
-                  Text(
-                    'Confidence: $confidenceText',
-                    style: Theme.of(context).textTheme.labelSmall,
-                  ),
+                const SizedBox(width: 8),
               ],
-            ),
+              Text(
+                'Step ${state.stepIndex + 1} / ${state.totalSteps}',
+                style: Theme.of(context)
+                    .textTheme
+                    .labelSmall
+                    ?.copyWith(color: cs.onSurfaceVariant),
+              ),
+              const Spacer(),
+              if (pct != null) ...[
+                Icon(Icons.psychology_outlined,
+                    size: 12, color: cs.onSurfaceVariant),
+                const SizedBox(width: 3),
+                Text(pct,
+                    style: Theme.of(context)
+                        .textTheme
+                        .labelSmall
+                        ?.copyWith(color: cs.onSurfaceVariant)),
+              ],
+            ],
+          ),
           if (state.lastLlmReasoning != null &&
               state.lastLlmReasoning!.isNotEmpty) ...[
-            const SizedBox(height: 4),
+            const SizedBox(height: 5),
             Text(
               state.lastLlmReasoning!,
               style: Theme.of(context).textTheme.bodySmall,

@@ -1,60 +1,46 @@
-# Deferred Improvements
+# Improvements Log
 
-Items identified during the batch review of March 2026 but deferred to keep the
-change set focused. Pick these up in a future session.
-
----
-
-## UI / Results view
-
-### Screenshot zoom / lightbox
-**Context:** `lib/screens/runner/results_view.dart`
-Clicking a `screenshotBefore` or `screenshotAfter` thumbnail opens it in a
-full-screen overlay (lightbox). Allows inspectors to see exactly what the LLM
-saw at the moment of each decision without squinting at the thumbnail.
-**Suggested approach:** `showDialog` + `InteractiveViewer` wrapping the full
-`Image.memory` widget.
-
-### `_selectedRunIndex` persists across cubit reloads
-**Context:** `lib/screens/runner/results_view.dart`
-`_selectedRunIndex` is local widget state, so switching away from the Results
-tab and back resets the selection to run 0. Store the selected index in the
-cubit (or `RunnerFinished` state) so the user returns to the same run.
-
-### Pass / fail colour accessibility
-**Context:** `lib/screens/runner/results_view.dart`
-Success/failure is currently conveyed by colour alone (green / red). Add a
-distinct icon as well (e.g., `Icons.check_circle` / `Icons.cancel`) so the
-result is perceivable by colour-blind users and in monochrome prints.
+Tracked during the batch review of March 2026.
 
 ---
 
-## Diagnostics / Logging
+## ✅ Completed (March 2026 session)
 
-### DPR value logged on WebView attach
-**Context:** `lib/services/webview_service.dart`, `attach()` method
-Log the resolved `_dpr` value as part of the WebView-ready banner so it is easy
-to confirm the correct device-pixel-ratio is in use during debugging, especially
-on HiDPI displays where DPR ≠ 1.
+| # | Item | File(s) |
+|---|------|---------|
+| 1 | **Screenshot zoom / lightbox** — click any thumbnail to open a full-screen `InteractiveViewer` overlay (zoom 0.3×–5×, close button, black backdrop) | `lib/widgets/screenshot_panel.dart` |
+| 2 | **`selectedRunIndex` persists across tab switches** — moved from local widget state to `RunnerFinished.selectedRunIndex` (Freezed `@Default(0)`); driven by new `cubit.selectRun(int)` method | `lib/cubits/runner/runner_state.dart`, `runner_cubit.dart`, `results_view.dart` |
+| 3 | **Pass / fail colour accessibility** — success/failure shown via icon + colour everywhere (results list, step cards, summary bar) | `lib/screens/runner/results_view.dart` |
+| 4 | **DPR value logged on WebView attach** — `dev.log('DPR = $_dpr', name: 'MoraTests')` emitted in `_readDpr()` | `lib/services/webview_service.dart` |
+| 5 | **Confidence default 0.5 instead of 1.0** — neutral fallback when LLM omits the `confidence` field | `lib/services/llm_service.dart` |
 
 ---
 
-## LLM / Confidence
+## 🔲 Deferred
 
-### Confidence default 0.5 instead of 1.0
-**Context:** `lib/services/llm_service.dart`, `_parseAction()`
-When the LLM omits the `confidence` field the fallback is currently `1.0`
-(maximum certainty). A neutral default of `0.5` is more honest and avoids
-misleading "100% confident" entries in the results view for responses that
-didn't include the field.
+### Lightbox keyboard navigation
+**Context:** `lib/widgets/screenshot_panel.dart`
+Add `RawKeyboardListener` (or `Focus` + `onKeyEvent`) inside the lightbox dialog
+to close on Escape and step between screenshots (← / →) when a test has multiple
+steps open. Currently only pointer/tap dismiss is supported.
 
-```dart
-confidence: (json['confidence'] as num?)?.toDouble() ?? 0.5,
-```
+### `selectedRunIndex` survives `loadHistory()`
+**Context:** `lib/cubits/runner/runner_cubit.dart`
+When the user presses History, the new `RunnerFinished` state is created with
+`selectedRunIndex: 0`, discarding any previously highlighted run. Consider
+passing the current index through if the previous state was also `RunnerFinished`.
+
+### Per-run notes / tagging
+Allow the user to annotate a saved run with a short text note (stored in the
+JSON alongside the run data). Useful for marking regressions or tracking root
+causes in the history list.
 
 ---
 
 ## Notes
 
-All items above are non-breaking quality-of-life improvements that do not
-require model changes, `build_runner` regeneration, or new dependencies.
+- Items in **✅ Completed** were all implemented without `build_runner` regeneration
+  *except* `selectedRunIndex`, which required one `build_runner build` run after the
+  new Freezed field was added.
+- The `image: ^4.3.0` package was added for screenshot compression in the HTML
+  report export (`lib/services/report_service.dart`).

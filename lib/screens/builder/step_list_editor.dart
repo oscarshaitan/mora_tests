@@ -18,6 +18,7 @@ class StepListEditor extends StatelessWidget {
         ReorderableListView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
+          buildDefaultDragHandles: false,
           itemCount: test.steps.length,
           onReorder: cubit.reorderSteps,
           itemBuilder: (context, i) {
@@ -132,13 +133,23 @@ class _StepCardState extends State<_StepCard> {
         ),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                const Icon(Icons.drag_handle, size: 20),
+                ReorderableDragStartListener(
+                  index: widget.index,
+                  child: MouseRegion(
+                    cursor: SystemMouseCursors.grab,
+                    child: Icon(
+                      Icons.drag_handle,
+                      size: 20,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
                 const SizedBox(width: 8),
                 Text(
                   'Step ${widget.index + 1}',
@@ -152,7 +163,7 @@ class _StepCardState extends State<_StepCard> {
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
             TextFormField(
               controller: _instructionCtrl,
               decoration: const InputDecoration(
@@ -160,10 +171,11 @@ class _StepCardState extends State<_StepCard> {
                 border: OutlineInputBorder(),
                 isDense: true,
               ),
-              maxLines: 2,
+              minLines: 1,
+              maxLines: null,
               onChanged: (_) => _notify(),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 14),
             TextFormField(
               controller: _hintCtrl,
               decoration: const InputDecoration(
@@ -171,10 +183,11 @@ class _StepCardState extends State<_StepCard> {
                 border: OutlineInputBorder(),
                 isDense: true,
               ),
-              maxLines: 2,
+              minLines: 1,
+              maxLines: null,
               onChanged: (_) => _notify(),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 14),
             TextFormField(
               controller: _assertCtrl,
               decoration: const InputDecoration(
@@ -182,9 +195,11 @@ class _StepCardState extends State<_StepCard> {
                 border: OutlineInputBorder(),
                 isDense: true,
               ),
+              minLines: 1,
+              maxLines: null,
               onChanged: (_) => _notify(),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 16),
             Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [

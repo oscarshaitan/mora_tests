@@ -128,13 +128,13 @@ return error(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>({TResult Function()?  idle,TResult Function( List<TestCase> testCases,  List<String> selectedIds,  String? sourcePath)?  ready,TResult Function( TestCase currentTest,  List<StepResult> completedSteps,  TestStep activeStep,  int stepIndex,  int totalSteps,  String? lastLlmReasoning,  double? lastLlmConfidence,  String? lastActionName)?  running,TResult Function( List<TestRun> runs,  List<TestCase> testCases,  List<String> selectedIds)?  finished,TResult Function( String message)?  error,required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>({TResult Function()?  idle,TResult Function( List<TestCase> testCases,  List<String> selectedIds,  String? sourcePath)?  ready,TResult Function( TestCase currentTest,  List<StepResult> completedSteps,  TestStep activeStep,  int stepIndex,  int totalSteps,  String? lastLlmReasoning,  double? lastLlmConfidence,  String? lastActionName)?  running,TResult Function( List<TestRun> runs,  List<TestCase> testCases,  List<String> selectedIds,  int selectedRunIndex)?  finished,TResult Function( String message)?  error,required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case RunnerIdle() when idle != null:
 return idle();case RunnerReady() when ready != null:
 return ready(_that.testCases,_that.selectedIds,_that.sourcePath);case RunnerRunning() when running != null:
 return running(_that.currentTest,_that.completedSteps,_that.activeStep,_that.stepIndex,_that.totalSteps,_that.lastLlmReasoning,_that.lastLlmConfidence,_that.lastActionName);case RunnerFinished() when finished != null:
-return finished(_that.runs,_that.testCases,_that.selectedIds);case RunnerError() when error != null:
+return finished(_that.runs,_that.testCases,_that.selectedIds,_that.selectedRunIndex);case RunnerError() when error != null:
 return error(_that.message);case _:
   return orElse();
 
@@ -153,13 +153,13 @@ return error(_that.message);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>({required TResult Function()  idle,required TResult Function( List<TestCase> testCases,  List<String> selectedIds,  String? sourcePath)  ready,required TResult Function( TestCase currentTest,  List<StepResult> completedSteps,  TestStep activeStep,  int stepIndex,  int totalSteps,  String? lastLlmReasoning,  double? lastLlmConfidence,  String? lastActionName)  running,required TResult Function( List<TestRun> runs,  List<TestCase> testCases,  List<String> selectedIds)  finished,required TResult Function( String message)  error,}) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>({required TResult Function()  idle,required TResult Function( List<TestCase> testCases,  List<String> selectedIds,  String? sourcePath)  ready,required TResult Function( TestCase currentTest,  List<StepResult> completedSteps,  TestStep activeStep,  int stepIndex,  int totalSteps,  String? lastLlmReasoning,  double? lastLlmConfidence,  String? lastActionName)  running,required TResult Function( List<TestRun> runs,  List<TestCase> testCases,  List<String> selectedIds,  int selectedRunIndex)  finished,required TResult Function( String message)  error,}) {final _that = this;
 switch (_that) {
 case RunnerIdle():
 return idle();case RunnerReady():
 return ready(_that.testCases,_that.selectedIds,_that.sourcePath);case RunnerRunning():
 return running(_that.currentTest,_that.completedSteps,_that.activeStep,_that.stepIndex,_that.totalSteps,_that.lastLlmReasoning,_that.lastLlmConfidence,_that.lastActionName);case RunnerFinished():
-return finished(_that.runs,_that.testCases,_that.selectedIds);case RunnerError():
+return finished(_that.runs,_that.testCases,_that.selectedIds,_that.selectedRunIndex);case RunnerError():
 return error(_that.message);}
 }
 /// A variant of `when` that fallback to returning `null`
@@ -174,13 +174,13 @@ return error(_that.message);}
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>({TResult? Function()?  idle,TResult? Function( List<TestCase> testCases,  List<String> selectedIds,  String? sourcePath)?  ready,TResult? Function( TestCase currentTest,  List<StepResult> completedSteps,  TestStep activeStep,  int stepIndex,  int totalSteps,  String? lastLlmReasoning,  double? lastLlmConfidence,  String? lastActionName)?  running,TResult? Function( List<TestRun> runs,  List<TestCase> testCases,  List<String> selectedIds)?  finished,TResult? Function( String message)?  error,}) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>({TResult? Function()?  idle,TResult? Function( List<TestCase> testCases,  List<String> selectedIds,  String? sourcePath)?  ready,TResult? Function( TestCase currentTest,  List<StepResult> completedSteps,  TestStep activeStep,  int stepIndex,  int totalSteps,  String? lastLlmReasoning,  double? lastLlmConfidence,  String? lastActionName)?  running,TResult? Function( List<TestRun> runs,  List<TestCase> testCases,  List<String> selectedIds,  int selectedRunIndex)?  finished,TResult? Function( String message)?  error,}) {final _that = this;
 switch (_that) {
 case RunnerIdle() when idle != null:
 return idle();case RunnerReady() when ready != null:
 return ready(_that.testCases,_that.selectedIds,_that.sourcePath);case RunnerRunning() when running != null:
 return running(_that.currentTest,_that.completedSteps,_that.activeStep,_that.stepIndex,_that.totalSteps,_that.lastLlmReasoning,_that.lastLlmConfidence,_that.lastActionName);case RunnerFinished() when finished != null:
-return finished(_that.runs,_that.testCases,_that.selectedIds);case RunnerError() when error != null:
+return finished(_that.runs,_that.testCases,_that.selectedIds,_that.selectedRunIndex);case RunnerError() when error != null:
 return error(_that.message);case _:
   return null;
 
@@ -411,7 +411,7 @@ $TestStepCopyWith<$Res> get activeStep {
 
 
 class RunnerFinished implements RunnerState {
-  const RunnerFinished({required final  List<TestRun> runs, required final  List<TestCase> testCases, required final  List<String> selectedIds}): _runs = runs,_testCases = testCases,_selectedIds = selectedIds;
+  const RunnerFinished({required final  List<TestRun> runs, required final  List<TestCase> testCases, required final  List<String> selectedIds, this.selectedRunIndex = 0}): _runs = runs,_testCases = testCases,_selectedIds = selectedIds;
   
 
  final  List<TestRun> _runs;
@@ -435,6 +435,7 @@ class RunnerFinished implements RunnerState {
   return EqualUnmodifiableListView(_selectedIds);
 }
 
+@JsonKey() final  int selectedRunIndex;
 
 /// Create a copy of RunnerState
 /// with the given fields replaced by the non-null parameter values.
@@ -446,16 +447,16 @@ $RunnerFinishedCopyWith<RunnerFinished> get copyWith => _$RunnerFinishedCopyWith
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is RunnerFinished&&const DeepCollectionEquality().equals(other._runs, _runs)&&const DeepCollectionEquality().equals(other._testCases, _testCases)&&const DeepCollectionEquality().equals(other._selectedIds, _selectedIds));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is RunnerFinished&&const DeepCollectionEquality().equals(other._runs, _runs)&&const DeepCollectionEquality().equals(other._testCases, _testCases)&&const DeepCollectionEquality().equals(other._selectedIds, _selectedIds)&&(identical(other.selectedRunIndex, selectedRunIndex) || other.selectedRunIndex == selectedRunIndex));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,const DeepCollectionEquality().hash(_runs),const DeepCollectionEquality().hash(_testCases),const DeepCollectionEquality().hash(_selectedIds));
+int get hashCode => Object.hash(runtimeType,const DeepCollectionEquality().hash(_runs),const DeepCollectionEquality().hash(_testCases),const DeepCollectionEquality().hash(_selectedIds),selectedRunIndex);
 
 @override
 String toString() {
-  return 'RunnerState.finished(runs: $runs, testCases: $testCases, selectedIds: $selectedIds)';
+  return 'RunnerState.finished(runs: $runs, testCases: $testCases, selectedIds: $selectedIds, selectedRunIndex: $selectedRunIndex)';
 }
 
 
@@ -466,7 +467,7 @@ abstract mixin class $RunnerFinishedCopyWith<$Res> implements $RunnerStateCopyWi
   factory $RunnerFinishedCopyWith(RunnerFinished value, $Res Function(RunnerFinished) _then) = _$RunnerFinishedCopyWithImpl;
 @useResult
 $Res call({
- List<TestRun> runs, List<TestCase> testCases, List<String> selectedIds
+ List<TestRun> runs, List<TestCase> testCases, List<String> selectedIds, int selectedRunIndex
 });
 
 
@@ -483,12 +484,13 @@ class _$RunnerFinishedCopyWithImpl<$Res>
 
 /// Create a copy of RunnerState
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') $Res call({Object? runs = null,Object? testCases = null,Object? selectedIds = null,}) {
+@pragma('vm:prefer-inline') $Res call({Object? runs = null,Object? testCases = null,Object? selectedIds = null,Object? selectedRunIndex = null,}) {
   return _then(RunnerFinished(
 runs: null == runs ? _self._runs : runs // ignore: cast_nullable_to_non_nullable
 as List<TestRun>,testCases: null == testCases ? _self._testCases : testCases // ignore: cast_nullable_to_non_nullable
 as List<TestCase>,selectedIds: null == selectedIds ? _self._selectedIds : selectedIds // ignore: cast_nullable_to_non_nullable
-as List<String>,
+as List<String>,selectedRunIndex: null == selectedRunIndex ? _self.selectedRunIndex : selectedRunIndex // ignore: cast_nullable_to_non_nullable
+as int,
   ));
 }
 

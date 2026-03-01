@@ -209,6 +209,14 @@ class RunnerCubit extends Cubit<RunnerState> {
     ));
   }
 
+  /// Persists the selected run index across tab switches.
+  void selectRun(int index) {
+    final finished = state;
+    if (finished is! RunnerFinished) return;
+    final clamped = index.clamp(0, finished.runs.length - 1);
+    emit(finished.copyWith(selectedRunIndex: clamped));
+  }
+
   void backToReady() {
     final finished = state;
     if (finished is RunnerFinished) {

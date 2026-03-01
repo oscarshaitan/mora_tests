@@ -33,12 +33,12 @@ class StepCard extends StatelessWidget {
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
         color: status == StepCardStatus.running
-            ? Theme.of(context).colorScheme.primaryContainer.withOpacity(0.3)
+            ? Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3)
             : null,
         borderRadius: BorderRadius.circular(6),
         border: Border.all(
           color: status == StepCardStatus.running
-              ? Theme.of(context).colorScheme.primary.withOpacity(0.4)
+              ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.4)
               : Theme.of(context).colorScheme.outlineVariant,
         ),
       ),

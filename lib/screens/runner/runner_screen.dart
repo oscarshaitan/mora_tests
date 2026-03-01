@@ -33,38 +33,53 @@ class _IdleView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cubit = context.read<RunnerCubit>();
+    final cs = Theme.of(context).colorScheme;
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.play_circle_outline,
-              size: 72,
-              color: Theme.of(context).colorScheme.outlineVariant),
+          Icon(Icons.play_circle_outline_rounded,
+              size: 72, color: cs.outlineVariant),
           const SizedBox(height: 16),
           Text('Open a test file or folder to get started',
               style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 24),
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              FilledButton.icon(
-                onPressed: cubit.openFolder,
-                icon: const Icon(Icons.folder_open),
-                label: const Text('Open Folder'),
-              ),
-              const SizedBox(width: 12),
-              OutlinedButton.icon(
-                onPressed: cubit.openFile,
-                icon: const Icon(Icons.insert_drive_file_outlined),
-                label: const Text('Open File'),
-              ),
-              const SizedBox(width: 12),
-              OutlinedButton.icon(
-                onPressed: cubit.loadHistory,
-                icon: const Icon(Icons.history),
-                label: const Text('History'),
-              ),
-            ],
+          const SizedBox(height: 6),
+          Text('Or view previous runs from History',
+              style: Theme.of(context)
+                  .textTheme
+                  .bodySmall
+                  ?.copyWith(color: cs.onSurfaceVariant)),
+          const SizedBox(height: 28),
+          // Action buttons
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            decoration: BoxDecoration(
+              color: cs.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.5)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                FilledButton.icon(
+                  onPressed: cubit.openFolder,
+                  icon: const Icon(Icons.folder_open, size: 18),
+                  label: const Text('Open Folder'),
+                ),
+                const SizedBox(width: 10),
+                OutlinedButton.icon(
+                  onPressed: cubit.openFile,
+                  icon: const Icon(Icons.insert_drive_file_outlined, size: 18),
+                  label: const Text('Open File'),
+                ),
+                const SizedBox(width: 10),
+                OutlinedButton.icon(
+                  onPressed: cubit.loadHistory,
+                  icon: const Icon(Icons.history, size: 18),
+                  label: const Text('History'),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -162,14 +177,34 @@ class _ReadyView extends StatelessWidget {
           ),
         ),
         const VerticalDivider(width: 1),
-        // Right: empty placeholder
+        // Right: empty state placeholder
         Expanded(
           child: Center(
-            child: Text(
-              'Select tests and press Run',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.monitor_outlined,
+                  size: 56,
+                  color: Theme.of(context).colorScheme.outlineVariant,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Select tests and press Run',
+                  style: TextStyle(
+                    fontSize: 15,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'The live browser will appear here during execution',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.outlineVariant,
+                  ),
+                ),
+              ],
             ),
           ),
         ),
@@ -186,24 +221,44 @@ class _ErrorView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.error_outline,
-              size: 48,
-              color: Theme.of(context).colorScheme.error),
-          const SizedBox(height: 12),
-          Text(message,
-              style: TextStyle(
-                  color: Theme.of(context).colorScheme.error)),
-          const SizedBox(height: 16),
-          FilledButton(
-            onPressed: () =>
-                context.read<RunnerCubit>().backToReady(),
-            child: const Text('Back'),
-          ),
-        ],
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 440),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.error_outline_rounded, size: 48, color: cs.error),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: cs.errorContainer,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.warning_amber_rounded,
+                      size: 18, color: cs.onErrorContainer),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      message,
+                      style:
+                          TextStyle(color: cs.onErrorContainer, fontSize: 13),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+            FilledButton.icon(
+              onPressed: context.read<RunnerCubit>().backToReady,
+              icon: const Icon(Icons.arrow_back, size: 16),
+              label: const Text('Go Back'),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -98,6 +98,7 @@ class WebViewService {
       final v = await _ctrl.evaluateJavascript(source: 'window.devicePixelRatio');
       if (v is num && v > 0) {
         _dpr = v.toDouble();
+        dev.log('DPR = $_dpr', name: 'MoraTests');
       }
     } catch (_) {}
   }

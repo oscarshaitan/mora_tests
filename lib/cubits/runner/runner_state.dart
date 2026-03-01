@@ -32,6 +32,7 @@ sealed class RunnerState with _$RunnerState {
     required List<TestRun> runs,
     required List<TestCase> testCases,
     required List<String> selectedIds,
+    @Default(0) int selectedRunIndex,
   }) = RunnerFinished;
 
   const factory RunnerState.error(String message) = RunnerError;

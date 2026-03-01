@@ -21,8 +21,6 @@ class ResultsView extends StatefulWidget {
 }
 
 class _ResultsViewState extends State<ResultsView> {
-  int _selectedRunIndex = 0;
-
   @override
   Widget build(BuildContext context) {
     final runs = widget.state.runs;
@@ -30,22 +28,27 @@ class _ResultsViewState extends State<ResultsView> {
       return const Center(child: Text('No runs to display'));
     }
 
-    final run = runs[_selectedRunIndex];
+    // Clamp in case the runs list shrank since the index was stored.
+    final selectedIndex =
+        widget.state.selectedRunIndex.clamp(0, runs.length - 1);
+    final run = runs[selectedIndex];
+    final cubit = context.read<RunnerCubit>();
 
     return Row(
       children: [
         // Left: run list
         SizedBox(
-          width: 220,
+          width: 230,
           child: Column(
             children: [
+              // Action buttons
               Padding(
                 padding: const EdgeInsets.all(8),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     OutlinedButton.icon(
-                      onPressed: context.read<RunnerCubit>().backToReady,
+                      onPressed: cubit.backToReady,
                       icon: const Icon(Icons.arrow_back, size: 16),
                       label: const Text('Back'),
                     ),
@@ -53,8 +56,7 @@ class _ResultsViewState extends State<ResultsView> {
                     OutlinedButton.icon(
                       onPressed: () => _exportReport(context, runs),
                       icon: const Icon(Icons.file_download_outlined, size: 16),
-                      label: Text(
-                          'Export HTML (${runs.length})'),
+                      label: Text('Export HTML (${runs.length})'),
                     ),
                   ],
                 ),
@@ -66,10 +68,18 @@ class _ResultsViewState extends State<ResultsView> {
                   itemBuilder: (context, i) {
                     final r = runs[i];
                     return ListTile(
-                      selected: i == _selectedRunIndex,
+                      selected: i == selectedIndex,
+                      selectedTileColor: Theme.of(context)
+                          .colorScheme
+                          .primaryContainer
+                          .withValues(alpha: 0.25),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 2),
                       leading: Icon(
                         r.passed ? Icons.check_circle : Icons.cancel,
-                        color: r.passed ? Colors.green : Colors.red,
+                        color: r.passed
+                            ? Colors.green.shade700
+                            : Colors.red.shade700,
                         size: 20,
                       ),
                       title: Text(
@@ -79,11 +89,11 @@ class _ResultsViewState extends State<ResultsView> {
                         style: const TextStyle(fontSize: 13),
                       ),
                       subtitle: Text(
-                        '${r.passedCount}/${r.results.length} passed  '
-                        '${_formatDuration(r.totalDuration)}',
+                        '${r.passedCount}/${r.results.length} passed'
+                        '  ·  ${_fmtDuration(r.totalDuration)}',
                         style: const TextStyle(fontSize: 11),
                       ),
-                      onTap: () => setState(() => _selectedRunIndex = i),
+                      onTap: () => cubit.selectRun(i),
                     );
                   },
                 ),
@@ -100,7 +110,7 @@ class _ResultsViewState extends State<ResultsView> {
     );
   }
 
-  String _formatDuration(Duration d) {
+  String _fmtDuration(Duration d) {
     if (d.inSeconds < 60) return '${d.inSeconds}s';
     return '${d.inMinutes}m ${d.inSeconds % 60}s';
   }
@@ -151,34 +161,59 @@ class _ResultsViewState extends State<ResultsView> {
   String _pad(int n) => n.toString().padLeft(2, '0');
 }
 
+String _fmtDuration(Duration d) {
+  if (d.inSeconds < 60) return '${d.inSeconds}s';
+  return '${d.inMinutes}m ${d.inSeconds % 60}s';
+}
+
 class _RunDetail extends StatelessWidget {
   final TestRun run;
   const _RunDetail({required this.run});
 
   @override
   Widget build(BuildContext context) {
+    final passColor = run.passed ? Colors.green.shade700 : Colors.red.shade700;
+    final passBg =
+        run.passed ? Colors.green.shade50 : Colors.red.shade50;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Summary bar
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          color: run.passed ? Colors.green.shade50 : Colors.red.shade50,
+          decoration: BoxDecoration(
+            color: passBg,
+            border: Border(
+              bottom: BorderSide(
+                  color: run.passed
+                      ? Colors.green.shade200
+                      : Colors.red.shade200),
+            ),
+          ),
           child: Row(
             children: [
               Icon(
-                run.passed ? Icons.check_circle : Icons.cancel,
-                color: run.passed ? Colors.green : Colors.red,
+                run.passed ? Icons.check_circle_rounded : Icons.cancel_rounded,
+                color: passColor,
+                size: 20,
               ),
               const SizedBox(width: 8),
               Text(
-                run.passed ? 'All tests passed' : 'Some tests failed',
-                style: Theme.of(context).textTheme.titleSmall,
+                run.passed ? 'All steps passed' : 'Some steps failed',
+                style: Theme.of(context)
+                    .textTheme
+                    .titleSmall
+                    ?.copyWith(color: passColor),
               ),
               const Spacer(),
               Text(
-                '${run.passedCount}/${run.results.length} passed',
-                style: Theme.of(context).textTheme.bodySmall,
+                '${run.passedCount}/${run.results.length} steps'
+                '  ·  ${_fmtDuration(run.totalDuration)}',
+                style: Theme.of(context)
+                    .textTheme
+                    .bodySmall
+                    ?.copyWith(color: passColor),
               ),
             ],
           ),

@@ -4,7 +4,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../core/constants.dart';
 import '../cubits/settings/settings_cubit.dart';
 import '../cubits/settings/settings_state.dart';
-import '../models/app_settings.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -81,108 +80,126 @@ class _SettingsScreenState extends State<SettingsScreen> {
           padding: const EdgeInsets.all(24),
           child: SizedBox(
             width: 560,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Settings',
-                    style: Theme.of(context).textTheme.headlineSmall),
-                const SizedBox(height: 24),
-                Text('LLM Configuration',
-                    style: Theme.of(context).textTheme.titleMedium),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _baseUrlCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Base URL',
-                    border: OutlineInputBorder(),
-                    hintText: 'https://oai.endpoints.kepler.ai.cloud.ovh.net/v1',
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Settings',
+                      style: Theme.of(context).textTheme.headlineSmall),
+                  const SizedBox(height: 24),
+
+                  // ── LLM Configuration ─────────────────────────────────────
+                  Text('LLM Configuration',
+                      style: Theme.of(context).textTheme.titleMedium),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _baseUrlCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Base URL',
+                      border: OutlineInputBorder(),
+                      hintText:
+                          'https://oai.endpoints.kepler.ai.cloud.ovh.net/v1',
+                    ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _apiKeyCtrl,
-                  obscureText: true,
-                  decoration: const InputDecoration(
-                    labelText: 'API Key / Access Token',
-                    border: OutlineInputBorder(),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _apiKeyCtrl,
+                    obscureText: true,
+                    decoration: const InputDecoration(
+                      labelText: 'API Key / Access Token',
+                      border: OutlineInputBorder(),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 20),
-                Text('Model Selection',
-                    style: Theme.of(context).textTheme.titleSmall),
-                const SizedBox(height: 4),
-                Text(
-                  'Choose your primary model. The other preset is used as automatic fallback when the primary fails.',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-                const SizedBox(height: 12),
-                // Primary / Fallback preset cards
-                Row(
-                  children: _presets.map((preset) {
-                    final isPrimary = _modelCtrl.text == preset;
-                    final isFallback = _fallbackModelCtrl.text == preset;
-                    return Expanded(
-                      child: Padding(
-                        padding: EdgeInsets.only(
-                          right: preset == _presets.last ? 0 : 8,
+                  const SizedBox(height: 20),
+
+                  // ── Model Selection ────────────────────────────────────────
+                  Text('Model Selection',
+                      style: Theme.of(context).textTheme.titleSmall),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Choose your primary model. The other preset is used as automatic fallback when the primary fails.',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: _presets.map((preset) {
+                      final isPrimary = _modelCtrl.text == preset;
+                      final isFallback = _fallbackModelCtrl.text == preset;
+                      return Expanded(
+                        child: Padding(
+                          padding: EdgeInsets.only(
+                            right: preset == _presets.last ? 0 : 8,
+                          ),
+                          child: _ModelCard(
+                            modelId: preset,
+                            isPrimary: isPrimary,
+                            isFallback: isFallback && !isPrimary,
+                            onSetPrimary: () => _selectPrimary(preset),
+                          ),
                         ),
-                        child: _ModelCard(
-                          modelId: preset,
-                          isPrimary: isPrimary,
-                          isFallback: isFallback && !isPrimary,
-                          onSetPrimary: () => _selectPrimary(preset),
-                        ),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _modelCtrl,
+                    onChanged: (_) => setState(() {}),
+                    decoration: const InputDecoration(
+                      labelText: 'Primary model (custom override)',
+                      border: OutlineInputBorder(),
+                      hintText: 'Qwen2.5-VL-72B-Instruct',
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    controller: _fallbackModelCtrl,
+                    onChanged: (_) => setState(() {}),
+                    decoration: const InputDecoration(
+                      labelText: 'Fallback model (custom override)',
+                      border: OutlineInputBorder(),
+                      hintText: 'Mistral-Small-3.2-24B-Instruct-2506',
+                    ),
+                  ),
+                  const SizedBox(height: 28),
+
+                  // ── Behaviour ──────────────────────────────────────────────
+                  Text('Behaviour',
+                      style: Theme.of(context).textTheme.titleMedium),
+                  const SizedBox(height: 10),
+                  Card(
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      side: BorderSide(
+                          color: Theme.of(context).colorScheme.outlineVariant),
+                    ),
+                    child: SwitchListTile(
+                      title: const Text('Headless WebView'),
+                      subtitle: const Text(
+                          'Run WebView without a visible window'
+                          ' (not supported on all platforms)'),
+                      value: state.settings.browserHeadless,
+                      onChanged: (v) => cubit.update(
+                        state.settings.copyWith(browserHeadless: v),
                       ),
-                    );
-                  }).toList(),
-                ),
-                const SizedBox(height: 12),
-                // Custom override fields
-                TextFormField(
-                  controller: _modelCtrl,
-                  onChanged: (_) => setState(() {}),
-                  decoration: const InputDecoration(
-                    labelText: 'Primary model (custom override)',
-                    border: OutlineInputBorder(),
-                    hintText: 'Qwen2.5-VL-72B-Instruct',
+                    ),
                   ),
-                ),
-                const SizedBox(height: 8),
-                TextFormField(
-                  controller: _fallbackModelCtrl,
-                  onChanged: (_) => setState(() {}),
-                  decoration: const InputDecoration(
-                    labelText: 'Fallback model (custom override)',
-                    border: OutlineInputBorder(),
-                    hintText: 'Mistral-Small-3.2-24B-Instruct-2506',
+                  const SizedBox(height: 28),
+
+                  FilledButton.icon(
+                    onPressed: state.isSaving ? null : () => _save(context),
+                    icon: state.isSaving
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.save_rounded),
+                    label: const Text('Save Settings'),
                   ),
-                ),
-                const SizedBox(height: 24),
-                Text('Behaviour',
-                    style: Theme.of(context).textTheme.titleMedium),
-                const SizedBox(height: 8),
-                SwitchListTile(
-                  title: const Text('Headless WebView'),
-                  subtitle: const Text(
-                      'Run WebView without visible window (not supported on all platforms)'),
-                  value: state.settings.browserHeadless,
-                  onChanged: (v) => cubit.update(
-                    state.settings.copyWith(browserHeadless: v),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                FilledButton.icon(
-                  onPressed: state.isSaving ? null : () => _save(context),
-                  icon: state.isSaving
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.save),
-                  label: const Text('Save Settings'),
-                ),
-              ],
+                  const SizedBox(height: 24),
+                ],
+              ),
             ),
           ),
         );
