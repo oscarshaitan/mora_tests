@@ -18,28 +18,38 @@ class StepListEditor extends StatelessWidget {
 
     return Column(
       children: [
+        _InsertDivider(onInsert: () => cubit.addStepAt(0)),
         ReorderableListView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           buildDefaultDragHandles: false,
+          padding: EdgeInsets.zero,
           itemCount: test.steps.length,
           onReorder: cubit.reorderSteps,
           itemBuilder: (context, i) {
             final step = test.steps[i];
-            return _StepCard(
+            return Column(
               key: ValueKey(step.id),
-              step: step,
-              index: i,
-              onChanged: (updated) {
-                final steps = [...test.steps];
-                steps[i] = updated;
-                cubit.updateTest(test.copyWith(steps: steps));
-              },
-              onDelete: () => cubit.removeStep(step.id),
+              children: [
+                _StepCard(
+                  step: step,
+                  index: i,
+                  onChanged: (updated) {
+                    final steps = [...test.steps];
+                    steps[i] = updated;
+                    cubit.updateTest(test.copyWith(steps: steps));
+                  },
+                  onDelete: () => cubit.removeStep(step.id),
+                ),
+                if (i < test.steps.length - 1)
+                  _InsertDivider(
+                    onInsert: () => cubit.addStepAt(i + 1),
+                  ),
+              ],
             );
           },
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 24),
         OutlinedButton.icon(
           onPressed: cubit.addStep,
           icon: const Icon(Icons.add, size: 16),
@@ -57,7 +67,6 @@ class _StepCard extends StatefulWidget {
   final VoidCallback onDelete;
 
   const _StepCard({
-    super.key,
     required this.step,
     required this.index,
     required this.onChanged,
@@ -159,21 +168,97 @@ class _StepCardState extends State<_StepCard> {
     ));
   }
 
+  bool get _isCoordWarning =>
+      widget.step.instruction.contains('coordinate ');
+
+  bool get _isIncomplete {
+    final s = widget.step;
+    if (s.call != null) return s.call!.trim().isEmpty;
+    return s.instruction.trim().isEmpty;
+  }
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final hasCoordWarning = _isCoordWarning;
+    final incomplete = _isIncomplete;
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8),
-        side: BorderSide(color: colorScheme.outlineVariant),
+        side: BorderSide(
+          color: incomplete
+              ? colorScheme.error
+              : hasCoordWarning
+                  ? Colors.amber.shade600
+                  : colorScheme.outlineVariant,
+          width: (incomplete || hasCoordWarning) ? 1.5 : 1,
+        ),
       ),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(12, 8, 12, 14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // ── Incomplete step banner ─────────────────────────────────
+            if (incomplete) ...[
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                decoration: BoxDecoration(
+                  color: colorScheme.errorContainer,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(
+                      color: colorScheme.error.withValues(alpha: 0.4)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.error_outline,
+                        size: 16, color: colorScheme.onErrorContainer),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        widget.step.call != null
+                            ? 'Call path is empty — add a YAML file path'
+                            : 'Instruction is empty — this step will be skipped',
+                        style: TextStyle(
+                            fontSize: 12,
+                            color: colorScheme.onErrorContainer),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 10),
+            ],
+            // ── Coordinate warning banner ──────────────────────────────
+            if (hasCoordWarning && !incomplete) ...[
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                decoration: BoxDecoration(
+                  color: Colors.amber.shade50,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: Colors.amber.shade300),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.warning_amber_rounded,
+                        size: 16, color: Colors.amber.shade800),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Screen coordinates detected — consider updating the instruction to use a text or id selector',
+                        style: TextStyle(
+                            fontSize: 12, color: Colors.amber.shade900),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 10),
+            ],
             // ── Header row ────────────────────────────────────────────
             Row(
               children: [
@@ -422,6 +507,95 @@ class _StepCardState extends State<_StepCard> {
               }),
             ],
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _InsertDivider extends StatefulWidget {
+  final VoidCallback onInsert;
+  const _InsertDivider({required this.onInsert});
+
+  @override
+  State<_InsertDivider> createState() => _InsertDividerState();
+}
+
+class _InsertDividerState extends State<_InsertDivider> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: SizedBox(
+        height: 20,
+        child: Row(
+          children: [
+            Expanded(
+              child: Divider(
+                height: 1,
+                color: _hovered
+                    ? cs.primary
+                    : cs.outlineVariant.withValues(alpha: 0.4),
+              ),
+            ),
+            const SizedBox(width: 4),
+            InkWell(
+              onTap: widget.onInsert,
+              borderRadius: BorderRadius.circular(10),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 120),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: _hovered
+                      ? cs.primaryContainer
+                      : cs.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: _hovered
+                        ? cs.primary
+                        : cs.outlineVariant.withValues(alpha: 0.4),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.add,
+                        size: 12,
+                        color: _hovered
+                            ? cs.onPrimaryContainer
+                            : cs.onSurfaceVariant),
+                    const SizedBox(width: 3),
+                    Text(
+                      'Insert step',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: _hovered
+                            ? cs.onPrimaryContainer
+                            : cs.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 4),
+            Expanded(
+              child: Divider(
+                height: 1,
+                color: _hovered
+                    ? cs.primary
+                    : cs.outlineVariant.withValues(alpha: 0.4),
+              ),
+            ),
+          ],
+        ),
         ),
       ),
     );

@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(flutter pub get)",
-      "Bash(dart run flutter_launcher_icons)"
+      "Bash(dart run flutter_launcher_icons)",
+      "Bash(dart run build_runner build --delete-conflicting-outputs)"
     ]
   }
 }

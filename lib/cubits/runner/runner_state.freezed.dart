@@ -128,12 +128,12 @@ return error(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>({TResult Function()?  idle,TResult Function( List<TestCase> testCases,  List<String> selectedIds,  String? sourcePath)?  ready,TResult Function( TestCase currentTest,  List<StepResult> completedSteps,  TestStep activeStep,  int stepIndex,  int totalSteps,  String? lastLlmReasoning,  double? lastLlmConfidence,  String? lastActionName)?  running,TResult Function( List<TestRun> runs,  List<TestCase> testCases,  List<String> selectedIds,  int selectedRunIndex)?  finished,TResult Function( String message)?  error,required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>({TResult Function()?  idle,TResult Function( List<TestCase> testCases,  List<String> selectedIds,  String? sourcePath)?  ready,TResult Function( TestCase currentTest,  List<StepResult> completedSteps,  TestStep activeStep,  int stepIndex,  int totalSteps,  String? lastLlmReasoning,  double? lastLlmConfidence,  String? lastActionName,  TestCase? activeSubTest,  List<StepResult> completedSubSteps,  int subStepIndex,  int? totalSubSteps)?  running,TResult Function( List<TestRun> runs,  List<TestCase> testCases,  List<String> selectedIds,  int selectedRunIndex)?  finished,TResult Function( String message)?  error,required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case RunnerIdle() when idle != null:
 return idle();case RunnerReady() when ready != null:
 return ready(_that.testCases,_that.selectedIds,_that.sourcePath);case RunnerRunning() when running != null:
-return running(_that.currentTest,_that.completedSteps,_that.activeStep,_that.stepIndex,_that.totalSteps,_that.lastLlmReasoning,_that.lastLlmConfidence,_that.lastActionName);case RunnerFinished() when finished != null:
+return running(_that.currentTest,_that.completedSteps,_that.activeStep,_that.stepIndex,_that.totalSteps,_that.lastLlmReasoning,_that.lastLlmConfidence,_that.lastActionName,_that.activeSubTest,_that.completedSubSteps,_that.subStepIndex,_that.totalSubSteps);case RunnerFinished() when finished != null:
 return finished(_that.runs,_that.testCases,_that.selectedIds,_that.selectedRunIndex);case RunnerError() when error != null:
 return error(_that.message);case _:
   return orElse();
@@ -153,12 +153,12 @@ return error(_that.message);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>({required TResult Function()  idle,required TResult Function( List<TestCase> testCases,  List<String> selectedIds,  String? sourcePath)  ready,required TResult Function( TestCase currentTest,  List<StepResult> completedSteps,  TestStep activeStep,  int stepIndex,  int totalSteps,  String? lastLlmReasoning,  double? lastLlmConfidence,  String? lastActionName)  running,required TResult Function( List<TestRun> runs,  List<TestCase> testCases,  List<String> selectedIds,  int selectedRunIndex)  finished,required TResult Function( String message)  error,}) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>({required TResult Function()  idle,required TResult Function( List<TestCase> testCases,  List<String> selectedIds,  String? sourcePath)  ready,required TResult Function( TestCase currentTest,  List<StepResult> completedSteps,  TestStep activeStep,  int stepIndex,  int totalSteps,  String? lastLlmReasoning,  double? lastLlmConfidence,  String? lastActionName,  TestCase? activeSubTest,  List<StepResult> completedSubSteps,  int subStepIndex,  int? totalSubSteps)  running,required TResult Function( List<TestRun> runs,  List<TestCase> testCases,  List<String> selectedIds,  int selectedRunIndex)  finished,required TResult Function( String message)  error,}) {final _that = this;
 switch (_that) {
 case RunnerIdle():
 return idle();case RunnerReady():
 return ready(_that.testCases,_that.selectedIds,_that.sourcePath);case RunnerRunning():
-return running(_that.currentTest,_that.completedSteps,_that.activeStep,_that.stepIndex,_that.totalSteps,_that.lastLlmReasoning,_that.lastLlmConfidence,_that.lastActionName);case RunnerFinished():
+return running(_that.currentTest,_that.completedSteps,_that.activeStep,_that.stepIndex,_that.totalSteps,_that.lastLlmReasoning,_that.lastLlmConfidence,_that.lastActionName,_that.activeSubTest,_that.completedSubSteps,_that.subStepIndex,_that.totalSubSteps);case RunnerFinished():
 return finished(_that.runs,_that.testCases,_that.selectedIds,_that.selectedRunIndex);case RunnerError():
 return error(_that.message);}
 }
@@ -174,12 +174,12 @@ return error(_that.message);}
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>({TResult? Function()?  idle,TResult? Function( List<TestCase> testCases,  List<String> selectedIds,  String? sourcePath)?  ready,TResult? Function( TestCase currentTest,  List<StepResult> completedSteps,  TestStep activeStep,  int stepIndex,  int totalSteps,  String? lastLlmReasoning,  double? lastLlmConfidence,  String? lastActionName)?  running,TResult? Function( List<TestRun> runs,  List<TestCase> testCases,  List<String> selectedIds,  int selectedRunIndex)?  finished,TResult? Function( String message)?  error,}) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>({TResult? Function()?  idle,TResult? Function( List<TestCase> testCases,  List<String> selectedIds,  String? sourcePath)?  ready,TResult? Function( TestCase currentTest,  List<StepResult> completedSteps,  TestStep activeStep,  int stepIndex,  int totalSteps,  String? lastLlmReasoning,  double? lastLlmConfidence,  String? lastActionName,  TestCase? activeSubTest,  List<StepResult> completedSubSteps,  int subStepIndex,  int? totalSubSteps)?  running,TResult? Function( List<TestRun> runs,  List<TestCase> testCases,  List<String> selectedIds,  int selectedRunIndex)?  finished,TResult? Function( String message)?  error,}) {final _that = this;
 switch (_that) {
 case RunnerIdle() when idle != null:
 return idle();case RunnerReady() when ready != null:
 return ready(_that.testCases,_that.selectedIds,_that.sourcePath);case RunnerRunning() when running != null:
-return running(_that.currentTest,_that.completedSteps,_that.activeStep,_that.stepIndex,_that.totalSteps,_that.lastLlmReasoning,_that.lastLlmConfidence,_that.lastActionName);case RunnerFinished() when finished != null:
+return running(_that.currentTest,_that.completedSteps,_that.activeStep,_that.stepIndex,_that.totalSteps,_that.lastLlmReasoning,_that.lastLlmConfidence,_that.lastActionName,_that.activeSubTest,_that.completedSubSteps,_that.subStepIndex,_that.totalSubSteps);case RunnerFinished() when finished != null:
 return finished(_that.runs,_that.testCases,_that.selectedIds,_that.selectedRunIndex);case RunnerError() when error != null:
 return error(_that.message);case _:
   return null;
@@ -307,7 +307,7 @@ as String?,
 
 
 class RunnerRunning implements RunnerState {
-  const RunnerRunning({required this.currentTest, required final  List<StepResult> completedSteps, required this.activeStep, required this.stepIndex, required this.totalSteps, this.lastLlmReasoning, this.lastLlmConfidence, this.lastActionName}): _completedSteps = completedSteps;
+  const RunnerRunning({required this.currentTest, required final  List<StepResult> completedSteps, required this.activeStep, required this.stepIndex, required this.totalSteps, this.lastLlmReasoning, this.lastLlmConfidence, this.lastActionName, this.activeSubTest, final  List<StepResult> completedSubSteps = const [], this.subStepIndex = 0, this.totalSubSteps}): _completedSteps = completedSteps,_completedSubSteps = completedSubSteps;
   
 
  final  TestCase currentTest;
@@ -324,6 +324,17 @@ class RunnerRunning implements RunnerState {
  final  String? lastLlmReasoning;
  final  double? lastLlmConfidence;
  final  String? lastActionName;
+// Sub-test progress (non-null while a call step is executing)
+ final  TestCase? activeSubTest;
+ final  List<StepResult> _completedSubSteps;
+@JsonKey() List<StepResult> get completedSubSteps {
+  if (_completedSubSteps is EqualUnmodifiableListView) return _completedSubSteps;
+  // ignore: implicit_dynamic_type
+  return EqualUnmodifiableListView(_completedSubSteps);
+}
+
+@JsonKey() final  int subStepIndex;
+ final  int? totalSubSteps;
 
 /// Create a copy of RunnerState
 /// with the given fields replaced by the non-null parameter values.
@@ -335,16 +346,16 @@ $RunnerRunningCopyWith<RunnerRunning> get copyWith => _$RunnerRunningCopyWithImp
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is RunnerRunning&&(identical(other.currentTest, currentTest) || other.currentTest == currentTest)&&const DeepCollectionEquality().equals(other._completedSteps, _completedSteps)&&(identical(other.activeStep, activeStep) || other.activeStep == activeStep)&&(identical(other.stepIndex, stepIndex) || other.stepIndex == stepIndex)&&(identical(other.totalSteps, totalSteps) || other.totalSteps == totalSteps)&&(identical(other.lastLlmReasoning, lastLlmReasoning) || other.lastLlmReasoning == lastLlmReasoning)&&(identical(other.lastLlmConfidence, lastLlmConfidence) || other.lastLlmConfidence == lastLlmConfidence)&&(identical(other.lastActionName, lastActionName) || other.lastActionName == lastActionName));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is RunnerRunning&&(identical(other.currentTest, currentTest) || other.currentTest == currentTest)&&const DeepCollectionEquality().equals(other._completedSteps, _completedSteps)&&(identical(other.activeStep, activeStep) || other.activeStep == activeStep)&&(identical(other.stepIndex, stepIndex) || other.stepIndex == stepIndex)&&(identical(other.totalSteps, totalSteps) || other.totalSteps == totalSteps)&&(identical(other.lastLlmReasoning, lastLlmReasoning) || other.lastLlmReasoning == lastLlmReasoning)&&(identical(other.lastLlmConfidence, lastLlmConfidence) || other.lastLlmConfidence == lastLlmConfidence)&&(identical(other.lastActionName, lastActionName) || other.lastActionName == lastActionName)&&(identical(other.activeSubTest, activeSubTest) || other.activeSubTest == activeSubTest)&&const DeepCollectionEquality().equals(other._completedSubSteps, _completedSubSteps)&&(identical(other.subStepIndex, subStepIndex) || other.subStepIndex == subStepIndex)&&(identical(other.totalSubSteps, totalSubSteps) || other.totalSubSteps == totalSubSteps));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,currentTest,const DeepCollectionEquality().hash(_completedSteps),activeStep,stepIndex,totalSteps,lastLlmReasoning,lastLlmConfidence,lastActionName);
+int get hashCode => Object.hash(runtimeType,currentTest,const DeepCollectionEquality().hash(_completedSteps),activeStep,stepIndex,totalSteps,lastLlmReasoning,lastLlmConfidence,lastActionName,activeSubTest,const DeepCollectionEquality().hash(_completedSubSteps),subStepIndex,totalSubSteps);
 
 @override
 String toString() {
-  return 'RunnerState.running(currentTest: $currentTest, completedSteps: $completedSteps, activeStep: $activeStep, stepIndex: $stepIndex, totalSteps: $totalSteps, lastLlmReasoning: $lastLlmReasoning, lastLlmConfidence: $lastLlmConfidence, lastActionName: $lastActionName)';
+  return 'RunnerState.running(currentTest: $currentTest, completedSteps: $completedSteps, activeStep: $activeStep, stepIndex: $stepIndex, totalSteps: $totalSteps, lastLlmReasoning: $lastLlmReasoning, lastLlmConfidence: $lastLlmConfidence, lastActionName: $lastActionName, activeSubTest: $activeSubTest, completedSubSteps: $completedSubSteps, subStepIndex: $subStepIndex, totalSubSteps: $totalSubSteps)';
 }
 
 
@@ -355,11 +366,11 @@ abstract mixin class $RunnerRunningCopyWith<$Res> implements $RunnerStateCopyWit
   factory $RunnerRunningCopyWith(RunnerRunning value, $Res Function(RunnerRunning) _then) = _$RunnerRunningCopyWithImpl;
 @useResult
 $Res call({
- TestCase currentTest, List<StepResult> completedSteps, TestStep activeStep, int stepIndex, int totalSteps, String? lastLlmReasoning, double? lastLlmConfidence, String? lastActionName
+ TestCase currentTest, List<StepResult> completedSteps, TestStep activeStep, int stepIndex, int totalSteps, String? lastLlmReasoning, double? lastLlmConfidence, String? lastActionName, TestCase? activeSubTest, List<StepResult> completedSubSteps, int subStepIndex, int? totalSubSteps
 });
 
 
-$TestCaseCopyWith<$Res> get currentTest;$TestStepCopyWith<$Res> get activeStep;
+$TestCaseCopyWith<$Res> get currentTest;$TestStepCopyWith<$Res> get activeStep;$TestCaseCopyWith<$Res>? get activeSubTest;
 
 }
 /// @nodoc
@@ -372,7 +383,7 @@ class _$RunnerRunningCopyWithImpl<$Res>
 
 /// Create a copy of RunnerState
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') $Res call({Object? currentTest = null,Object? completedSteps = null,Object? activeStep = null,Object? stepIndex = null,Object? totalSteps = null,Object? lastLlmReasoning = freezed,Object? lastLlmConfidence = freezed,Object? lastActionName = freezed,}) {
+@pragma('vm:prefer-inline') $Res call({Object? currentTest = null,Object? completedSteps = null,Object? activeStep = null,Object? stepIndex = null,Object? totalSteps = null,Object? lastLlmReasoning = freezed,Object? lastLlmConfidence = freezed,Object? lastActionName = freezed,Object? activeSubTest = freezed,Object? completedSubSteps = null,Object? subStepIndex = null,Object? totalSubSteps = freezed,}) {
   return _then(RunnerRunning(
 currentTest: null == currentTest ? _self.currentTest : currentTest // ignore: cast_nullable_to_non_nullable
 as TestCase,completedSteps: null == completedSteps ? _self._completedSteps : completedSteps // ignore: cast_nullable_to_non_nullable
@@ -382,7 +393,11 @@ as int,totalSteps: null == totalSteps ? _self.totalSteps : totalSteps // ignore:
 as int,lastLlmReasoning: freezed == lastLlmReasoning ? _self.lastLlmReasoning : lastLlmReasoning // ignore: cast_nullable_to_non_nullable
 as String?,lastLlmConfidence: freezed == lastLlmConfidence ? _self.lastLlmConfidence : lastLlmConfidence // ignore: cast_nullable_to_non_nullable
 as double?,lastActionName: freezed == lastActionName ? _self.lastActionName : lastActionName // ignore: cast_nullable_to_non_nullable
-as String?,
+as String?,activeSubTest: freezed == activeSubTest ? _self.activeSubTest : activeSubTest // ignore: cast_nullable_to_non_nullable
+as TestCase?,completedSubSteps: null == completedSubSteps ? _self._completedSubSteps : completedSubSteps // ignore: cast_nullable_to_non_nullable
+as List<StepResult>,subStepIndex: null == subStepIndex ? _self.subStepIndex : subStepIndex // ignore: cast_nullable_to_non_nullable
+as int,totalSubSteps: freezed == totalSubSteps ? _self.totalSubSteps : totalSubSteps // ignore: cast_nullable_to_non_nullable
+as int?,
   ));
 }
 
@@ -403,6 +418,18 @@ $TestStepCopyWith<$Res> get activeStep {
   
   return $TestStepCopyWith<$Res>(_self.activeStep, (value) {
     return _then(_self.copyWith(activeStep: value));
+  });
+}/// Create a copy of RunnerState
+/// with the given fields replaced by the non-null parameter values.
+@override
+@pragma('vm:prefer-inline')
+$TestCaseCopyWith<$Res>? get activeSubTest {
+    if (_self.activeSubTest == null) {
+    return null;
+  }
+
+  return $TestCaseCopyWith<$Res>(_self.activeSubTest!, (value) {
+    return _then(_self.copyWith(activeSubTest: value));
   });
 }
 }

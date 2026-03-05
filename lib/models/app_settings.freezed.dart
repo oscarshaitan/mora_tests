@@ -15,7 +15,10 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$AppSettings {
 
- String get activeProvider; String get ovhBaseUrl; String get ovhApiKey; String get ovhPrimaryModel; String get ovhFallbackModel; String get vertexAiBaseUrl; String get vertexAiServiceAccountJson; String get vertexAiPrimaryModel; String get vertexAiFallbackModel; bool get browserHeadless; double get confidenceThreshold;
+// Which provider the test runner uses
+ String get activeProvider;// OVH AI
+ String get ovhBaseUrl; String get ovhApiKey; String get ovhPrimaryModel; String get ovhFallbackModel;// Vertex AI
+ String get vertexAiBaseUrl; String get vertexAiServiceAccountJson; String get vertexAiPrimaryModel; String get vertexAiFallbackModel; bool get browserHeadless; double get confidenceThreshold;
 /// Create a copy of AppSettings
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -88,6 +91,17 @@ as double,
 /// Adds pattern-matching-related methods to [AppSettings].
 extension AppSettingsPatterns on AppSettings {
 /// A variant of `map` that fallback to returning `orElse`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
 @optionalTypeArgs TResult maybeMap<TResult extends Object?>(TResult Function( _AppSettings value)?  $default,{required TResult orElse(),}){
 final _that = this;
 switch (_that) {
@@ -97,6 +111,18 @@ return $default(_that);case _:
 
 }
 }
+/// A `switch`-like method, using callbacks.
+///
+/// Callbacks receives the raw object, upcasted.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case final Subclass2 value:
+///     return ...;
+/// }
+/// ```
 
 @optionalTypeArgs TResult map<TResult extends Object?>(TResult Function( _AppSettings value)  $default,){
 final _that = this;
@@ -107,6 +133,17 @@ return $default(_that);case _:
 
 }
 }
+/// A variant of `map` that fallback to returning `null`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
 
 @optionalTypeArgs TResult? mapOrNull<TResult extends Object?>(TResult? Function( _AppSettings value)?  $default,){
 final _that = this;
@@ -117,6 +154,17 @@ return $default(_that);case _:
 
 }
 }
+/// A variant of `when` that fallback to an `orElse` callback.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
 
 @optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String activeProvider,  String ovhBaseUrl,  String ovhApiKey,  String ovhPrimaryModel,  String ovhFallbackModel,  String vertexAiBaseUrl,  String vertexAiServiceAccountJson,  String vertexAiPrimaryModel,  String vertexAiFallbackModel,  bool browserHeadless,  double confidenceThreshold)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
@@ -126,6 +174,18 @@ return $default(_that.activeProvider,_that.ovhBaseUrl,_that.ovhApiKey,_that.ovhP
 
 }
 }
+/// A `switch`-like method, using callbacks.
+///
+/// As opposed to `map`, this offers destructuring.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case Subclass2(:final field2):
+///     return ...;
+/// }
+/// ```
 
 @optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String activeProvider,  String ovhBaseUrl,  String ovhApiKey,  String ovhPrimaryModel,  String ovhFallbackModel,  String vertexAiBaseUrl,  String vertexAiServiceAccountJson,  String vertexAiPrimaryModel,  String vertexAiFallbackModel,  bool browserHeadless,  double confidenceThreshold)  $default,) {final _that = this;
 switch (_that) {
@@ -135,6 +195,17 @@ return $default(_that.activeProvider,_that.ovhBaseUrl,_that.ovhApiKey,_that.ovhP
 
 }
 }
+/// A variant of `when` that fallback to returning `null`
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
 
 @optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String activeProvider,  String ovhBaseUrl,  String ovhApiKey,  String ovhPrimaryModel,  String ovhFallbackModel,  String vertexAiBaseUrl,  String vertexAiServiceAccountJson,  String vertexAiPrimaryModel,  String vertexAiFallbackModel,  bool browserHeadless,  double confidenceThreshold)?  $default,) {final _that = this;
 switch (_that) {
@@ -154,11 +225,14 @@ class _AppSettings implements AppSettings {
   const _AppSettings({this.activeProvider = 'ovh', this.ovhBaseUrl = AppConstants.defaultLlmBaseUrl, this.ovhApiKey = '', this.ovhPrimaryModel = AppConstants.defaultLlmModel, this.ovhFallbackModel = AppConstants.mistralModel, this.vertexAiBaseUrl = AppConstants.vertexAiBaseUrl, this.vertexAiServiceAccountJson = '', this.vertexAiPrimaryModel = AppConstants.geminiFlashModel, this.vertexAiFallbackModel = AppConstants.geminiFlashLiteModel, this.browserHeadless = false, this.confidenceThreshold = 0.5});
   factory _AppSettings.fromJson(Map<String, dynamic> json) => _$AppSettingsFromJson(json);
 
+// Which provider the test runner uses
 @override@JsonKey() final  String activeProvider;
+// OVH AI
 @override@JsonKey() final  String ovhBaseUrl;
 @override@JsonKey() final  String ovhApiKey;
 @override@JsonKey() final  String ovhPrimaryModel;
 @override@JsonKey() final  String ovhFallbackModel;
+// Vertex AI
 @override@JsonKey() final  String vertexAiBaseUrl;
 @override@JsonKey() final  String vertexAiServiceAccountJson;
 @override@JsonKey() final  String vertexAiPrimaryModel;

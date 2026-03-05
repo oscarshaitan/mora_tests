@@ -14,7 +14,8 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$StepResult {
 
- String get stepId; bool get success; LlmAction? get actionTaken; Uint8List get screenshotBefore; Uint8List? get screenshotAfter; String? get errorMessage; String? get rawLlmResponse; Duration get duration; DateTime get executedAt;
+ String get stepId; bool get success; LlmAction? get actionTaken; Uint8List get screenshotBefore; Uint8List? get screenshotAfter; String? get errorMessage; String? get rawLlmResponse; Duration get duration; DateTime get executedAt;/// Sub-step results for call steps (populated when step.call != null).
+ List<StepResult> get subStepResults;
 /// Create a copy of StepResult
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -25,16 +26,16 @@ $StepResultCopyWith<StepResult> get copyWith => _$StepResultCopyWithImpl<StepRes
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is StepResult&&(identical(other.stepId, stepId) || other.stepId == stepId)&&(identical(other.success, success) || other.success == success)&&(identical(other.actionTaken, actionTaken) || other.actionTaken == actionTaken)&&const DeepCollectionEquality().equals(other.screenshotBefore, screenshotBefore)&&const DeepCollectionEquality().equals(other.screenshotAfter, screenshotAfter)&&(identical(other.errorMessage, errorMessage) || other.errorMessage == errorMessage)&&(identical(other.rawLlmResponse, rawLlmResponse) || other.rawLlmResponse == rawLlmResponse)&&(identical(other.duration, duration) || other.duration == duration)&&(identical(other.executedAt, executedAt) || other.executedAt == executedAt));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is StepResult&&(identical(other.stepId, stepId) || other.stepId == stepId)&&(identical(other.success, success) || other.success == success)&&(identical(other.actionTaken, actionTaken) || other.actionTaken == actionTaken)&&const DeepCollectionEquality().equals(other.screenshotBefore, screenshotBefore)&&const DeepCollectionEquality().equals(other.screenshotAfter, screenshotAfter)&&(identical(other.errorMessage, errorMessage) || other.errorMessage == errorMessage)&&(identical(other.rawLlmResponse, rawLlmResponse) || other.rawLlmResponse == rawLlmResponse)&&(identical(other.duration, duration) || other.duration == duration)&&(identical(other.executedAt, executedAt) || other.executedAt == executedAt)&&const DeepCollectionEquality().equals(other.subStepResults, subStepResults));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,stepId,success,actionTaken,const DeepCollectionEquality().hash(screenshotBefore),const DeepCollectionEquality().hash(screenshotAfter),errorMessage,rawLlmResponse,duration,executedAt);
+int get hashCode => Object.hash(runtimeType,stepId,success,actionTaken,const DeepCollectionEquality().hash(screenshotBefore),const DeepCollectionEquality().hash(screenshotAfter),errorMessage,rawLlmResponse,duration,executedAt,const DeepCollectionEquality().hash(subStepResults));
 
 @override
 String toString() {
-  return 'StepResult(stepId: $stepId, success: $success, actionTaken: $actionTaken, screenshotBefore: $screenshotBefore, screenshotAfter: $screenshotAfter, errorMessage: $errorMessage, rawLlmResponse: $rawLlmResponse, duration: $duration, executedAt: $executedAt)';
+  return 'StepResult(stepId: $stepId, success: $success, actionTaken: $actionTaken, screenshotBefore: $screenshotBefore, screenshotAfter: $screenshotAfter, errorMessage: $errorMessage, rawLlmResponse: $rawLlmResponse, duration: $duration, executedAt: $executedAt, subStepResults: $subStepResults)';
 }
 
 
@@ -45,7 +46,7 @@ abstract mixin class $StepResultCopyWith<$Res>  {
   factory $StepResultCopyWith(StepResult value, $Res Function(StepResult) _then) = _$StepResultCopyWithImpl;
 @useResult
 $Res call({
- String stepId, bool success, LlmAction? actionTaken, Uint8List screenshotBefore, Uint8List? screenshotAfter, String? errorMessage, String? rawLlmResponse, Duration duration, DateTime executedAt
+ String stepId, bool success, LlmAction? actionTaken, Uint8List screenshotBefore, Uint8List? screenshotAfter, String? errorMessage, String? rawLlmResponse, Duration duration, DateTime executedAt, List<StepResult> subStepResults
 });
 
 
@@ -62,7 +63,7 @@ class _$StepResultCopyWithImpl<$Res>
 
 /// Create a copy of StepResult
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? stepId = null,Object? success = null,Object? actionTaken = freezed,Object? screenshotBefore = null,Object? screenshotAfter = freezed,Object? errorMessage = freezed,Object? rawLlmResponse = freezed,Object? duration = null,Object? executedAt = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? stepId = null,Object? success = null,Object? actionTaken = freezed,Object? screenshotBefore = null,Object? screenshotAfter = freezed,Object? errorMessage = freezed,Object? rawLlmResponse = freezed,Object? duration = null,Object? executedAt = null,Object? subStepResults = null,}) {
   return _then(_self.copyWith(
 stepId: null == stepId ? _self.stepId : stepId // ignore: cast_nullable_to_non_nullable
 as String,success: null == success ? _self.success : success // ignore: cast_nullable_to_non_nullable
@@ -73,7 +74,8 @@ as Uint8List?,errorMessage: freezed == errorMessage ? _self.errorMessage : error
 as String?,rawLlmResponse: freezed == rawLlmResponse ? _self.rawLlmResponse : rawLlmResponse // ignore: cast_nullable_to_non_nullable
 as String?,duration: null == duration ? _self.duration : duration // ignore: cast_nullable_to_non_nullable
 as Duration,executedAt: null == executedAt ? _self.executedAt : executedAt // ignore: cast_nullable_to_non_nullable
-as DateTime,
+as DateTime,subStepResults: null == subStepResults ? _self.subStepResults : subStepResults // ignore: cast_nullable_to_non_nullable
+as List<StepResult>,
   ));
 }
 /// Create a copy of StepResult
@@ -170,10 +172,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String stepId,  bool success,  LlmAction? actionTaken,  Uint8List screenshotBefore,  Uint8List? screenshotAfter,  String? errorMessage,  String? rawLlmResponse,  Duration duration,  DateTime executedAt)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String stepId,  bool success,  LlmAction? actionTaken,  Uint8List screenshotBefore,  Uint8List? screenshotAfter,  String? errorMessage,  String? rawLlmResponse,  Duration duration,  DateTime executedAt,  List<StepResult> subStepResults)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _StepResult() when $default != null:
-return $default(_that.stepId,_that.success,_that.actionTaken,_that.screenshotBefore,_that.screenshotAfter,_that.errorMessage,_that.rawLlmResponse,_that.duration,_that.executedAt);case _:
+return $default(_that.stepId,_that.success,_that.actionTaken,_that.screenshotBefore,_that.screenshotAfter,_that.errorMessage,_that.rawLlmResponse,_that.duration,_that.executedAt,_that.subStepResults);case _:
   return orElse();
 
 }
@@ -191,10 +193,10 @@ return $default(_that.stepId,_that.success,_that.actionTaken,_that.screenshotBef
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String stepId,  bool success,  LlmAction? actionTaken,  Uint8List screenshotBefore,  Uint8List? screenshotAfter,  String? errorMessage,  String? rawLlmResponse,  Duration duration,  DateTime executedAt)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String stepId,  bool success,  LlmAction? actionTaken,  Uint8List screenshotBefore,  Uint8List? screenshotAfter,  String? errorMessage,  String? rawLlmResponse,  Duration duration,  DateTime executedAt,  List<StepResult> subStepResults)  $default,) {final _that = this;
 switch (_that) {
 case _StepResult():
-return $default(_that.stepId,_that.success,_that.actionTaken,_that.screenshotBefore,_that.screenshotAfter,_that.errorMessage,_that.rawLlmResponse,_that.duration,_that.executedAt);case _:
+return $default(_that.stepId,_that.success,_that.actionTaken,_that.screenshotBefore,_that.screenshotAfter,_that.errorMessage,_that.rawLlmResponse,_that.duration,_that.executedAt,_that.subStepResults);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -211,10 +213,10 @@ return $default(_that.stepId,_that.success,_that.actionTaken,_that.screenshotBef
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String stepId,  bool success,  LlmAction? actionTaken,  Uint8List screenshotBefore,  Uint8List? screenshotAfter,  String? errorMessage,  String? rawLlmResponse,  Duration duration,  DateTime executedAt)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String stepId,  bool success,  LlmAction? actionTaken,  Uint8List screenshotBefore,  Uint8List? screenshotAfter,  String? errorMessage,  String? rawLlmResponse,  Duration duration,  DateTime executedAt,  List<StepResult> subStepResults)?  $default,) {final _that = this;
 switch (_that) {
 case _StepResult() when $default != null:
-return $default(_that.stepId,_that.success,_that.actionTaken,_that.screenshotBefore,_that.screenshotAfter,_that.errorMessage,_that.rawLlmResponse,_that.duration,_that.executedAt);case _:
+return $default(_that.stepId,_that.success,_that.actionTaken,_that.screenshotBefore,_that.screenshotAfter,_that.errorMessage,_that.rawLlmResponse,_that.duration,_that.executedAt,_that.subStepResults);case _:
   return null;
 
 }
@@ -226,7 +228,7 @@ return $default(_that.stepId,_that.success,_that.actionTaken,_that.screenshotBef
 
 
 class _StepResult implements StepResult {
-  const _StepResult({required this.stepId, required this.success, this.actionTaken, required this.screenshotBefore, this.screenshotAfter, this.errorMessage, this.rawLlmResponse, required this.duration, required this.executedAt});
+  const _StepResult({required this.stepId, required this.success, this.actionTaken, required this.screenshotBefore, this.screenshotAfter, this.errorMessage, this.rawLlmResponse, required this.duration, required this.executedAt, final  List<StepResult> subStepResults = const []}): _subStepResults = subStepResults;
   
 
 @override final  String stepId;
@@ -238,6 +240,15 @@ class _StepResult implements StepResult {
 @override final  String? rawLlmResponse;
 @override final  Duration duration;
 @override final  DateTime executedAt;
+/// Sub-step results for call steps (populated when step.call != null).
+ final  List<StepResult> _subStepResults;
+/// Sub-step results for call steps (populated when step.call != null).
+@override@JsonKey() List<StepResult> get subStepResults {
+  if (_subStepResults is EqualUnmodifiableListView) return _subStepResults;
+  // ignore: implicit_dynamic_type
+  return EqualUnmodifiableListView(_subStepResults);
+}
+
 
 /// Create a copy of StepResult
 /// with the given fields replaced by the non-null parameter values.
@@ -249,16 +260,16 @@ _$StepResultCopyWith<_StepResult> get copyWith => __$StepResultCopyWithImpl<_Ste
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _StepResult&&(identical(other.stepId, stepId) || other.stepId == stepId)&&(identical(other.success, success) || other.success == success)&&(identical(other.actionTaken, actionTaken) || other.actionTaken == actionTaken)&&const DeepCollectionEquality().equals(other.screenshotBefore, screenshotBefore)&&const DeepCollectionEquality().equals(other.screenshotAfter, screenshotAfter)&&(identical(other.errorMessage, errorMessage) || other.errorMessage == errorMessage)&&(identical(other.rawLlmResponse, rawLlmResponse) || other.rawLlmResponse == rawLlmResponse)&&(identical(other.duration, duration) || other.duration == duration)&&(identical(other.executedAt, executedAt) || other.executedAt == executedAt));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _StepResult&&(identical(other.stepId, stepId) || other.stepId == stepId)&&(identical(other.success, success) || other.success == success)&&(identical(other.actionTaken, actionTaken) || other.actionTaken == actionTaken)&&const DeepCollectionEquality().equals(other.screenshotBefore, screenshotBefore)&&const DeepCollectionEquality().equals(other.screenshotAfter, screenshotAfter)&&(identical(other.errorMessage, errorMessage) || other.errorMessage == errorMessage)&&(identical(other.rawLlmResponse, rawLlmResponse) || other.rawLlmResponse == rawLlmResponse)&&(identical(other.duration, duration) || other.duration == duration)&&(identical(other.executedAt, executedAt) || other.executedAt == executedAt)&&const DeepCollectionEquality().equals(other._subStepResults, _subStepResults));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,stepId,success,actionTaken,const DeepCollectionEquality().hash(screenshotBefore),const DeepCollectionEquality().hash(screenshotAfter),errorMessage,rawLlmResponse,duration,executedAt);
+int get hashCode => Object.hash(runtimeType,stepId,success,actionTaken,const DeepCollectionEquality().hash(screenshotBefore),const DeepCollectionEquality().hash(screenshotAfter),errorMessage,rawLlmResponse,duration,executedAt,const DeepCollectionEquality().hash(_subStepResults));
 
 @override
 String toString() {
-  return 'StepResult(stepId: $stepId, success: $success, actionTaken: $actionTaken, screenshotBefore: $screenshotBefore, screenshotAfter: $screenshotAfter, errorMessage: $errorMessage, rawLlmResponse: $rawLlmResponse, duration: $duration, executedAt: $executedAt)';
+  return 'StepResult(stepId: $stepId, success: $success, actionTaken: $actionTaken, screenshotBefore: $screenshotBefore, screenshotAfter: $screenshotAfter, errorMessage: $errorMessage, rawLlmResponse: $rawLlmResponse, duration: $duration, executedAt: $executedAt, subStepResults: $subStepResults)';
 }
 
 
@@ -269,7 +280,7 @@ abstract mixin class _$StepResultCopyWith<$Res> implements $StepResultCopyWith<$
   factory _$StepResultCopyWith(_StepResult value, $Res Function(_StepResult) _then) = __$StepResultCopyWithImpl;
 @override @useResult
 $Res call({
- String stepId, bool success, LlmAction? actionTaken, Uint8List screenshotBefore, Uint8List? screenshotAfter, String? errorMessage, String? rawLlmResponse, Duration duration, DateTime executedAt
+ String stepId, bool success, LlmAction? actionTaken, Uint8List screenshotBefore, Uint8List? screenshotAfter, String? errorMessage, String? rawLlmResponse, Duration duration, DateTime executedAt, List<StepResult> subStepResults
 });
 
 
@@ -286,7 +297,7 @@ class __$StepResultCopyWithImpl<$Res>
 
 /// Create a copy of StepResult
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? stepId = null,Object? success = null,Object? actionTaken = freezed,Object? screenshotBefore = null,Object? screenshotAfter = freezed,Object? errorMessage = freezed,Object? rawLlmResponse = freezed,Object? duration = null,Object? executedAt = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? stepId = null,Object? success = null,Object? actionTaken = freezed,Object? screenshotBefore = null,Object? screenshotAfter = freezed,Object? errorMessage = freezed,Object? rawLlmResponse = freezed,Object? duration = null,Object? executedAt = null,Object? subStepResults = null,}) {
   return _then(_StepResult(
 stepId: null == stepId ? _self.stepId : stepId // ignore: cast_nullable_to_non_nullable
 as String,success: null == success ? _self.success : success // ignore: cast_nullable_to_non_nullable
@@ -297,7 +308,8 @@ as Uint8List?,errorMessage: freezed == errorMessage ? _self.errorMessage : error
 as String?,rawLlmResponse: freezed == rawLlmResponse ? _self.rawLlmResponse : rawLlmResponse // ignore: cast_nullable_to_non_nullable
 as String?,duration: null == duration ? _self.duration : duration // ignore: cast_nullable_to_non_nullable
 as Duration,executedAt: null == executedAt ? _self.executedAt : executedAt // ignore: cast_nullable_to_non_nullable
-as DateTime,
+as DateTime,subStepResults: null == subStepResults ? _self._subStepResults : subStepResults // ignore: cast_nullable_to_non_nullable
+as List<StepResult>,
   ));
 }
 

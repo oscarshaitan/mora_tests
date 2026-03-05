@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../cubits/builder/builder_cubit.dart';
 import '../../cubits/runner/runner_cubit.dart';
 import '../../cubits/runner/runner_state.dart';
+import '../../models/test_case.dart';
 import 'results_view.dart';
 import 'run_view.dart';
 
 class RunnerScreen extends StatelessWidget {
-  const RunnerScreen({super.key});
+  final VoidCallback? onSwitchToBuilder;
+  const RunnerScreen({super.key, this.onSwitchToBuilder});
 
   @override
   Widget build(BuildContext context) {
@@ -15,7 +18,8 @@ class RunnerScreen extends StatelessWidget {
       builder: (context, state) {
         return switch (state) {
           RunnerIdle() => const _IdleView(),
-          RunnerReady() => _ReadyView(state: state),
+          RunnerReady() => _ReadyView(
+              state: state, onSwitchToBuilder: onSwitchToBuilder),
           RunnerRunning() => RunView(state: state),
           RunnerFinished() => ResultsView(state: state),
           RunnerError(:final message) => _ErrorView(message: message),
@@ -91,11 +95,24 @@ class _IdleView extends StatelessWidget {
 
 class _ReadyView extends StatelessWidget {
   final RunnerReady state;
-  const _ReadyView({required this.state});
+  final VoidCallback? onSwitchToBuilder;
+  const _ReadyView({required this.state, this.onSwitchToBuilder});
+
+  static bool _hasIncomplete(TestCase tc) => tc.steps.any((s) {
+        if (s.call != null) return s.call!.trim().isEmpty;
+        return s.instruction.trim().isEmpty;
+      });
 
   @override
   Widget build(BuildContext context) {
     final cubit = context.read<RunnerCubit>();
+    final cs = Theme.of(context).colorScheme;
+
+    // Tests that are selected AND have incomplete steps
+    final incompleteSelected = state.testCases
+        .where((tc) =>
+            state.selectedIds.contains(tc.id) && _hasIncomplete(tc))
+        .toList();
 
     return Row(
       children: [
@@ -104,6 +121,66 @@ class _ReadyView extends StatelessWidget {
           width: 260,
           child: Column(
             children: [
+              // Incomplete steps warning
+              if (incompleteSelected.isNotEmpty)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  color: cs.errorContainer,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.error_outline,
+                              size: 14, color: cs.onErrorContainer),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              '${incompleteSelected.length} selected test${incompleteSelected.length == 1 ? '' : 's'} have incomplete steps',
+                              style: TextStyle(
+                                  fontSize: 11, color: cs.onErrorContainer),
+                            ),
+                          ),
+                        ],
+                      ),
+                      ...incompleteSelected.map((tc) => Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    tc.name,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                        fontSize: 11,
+                                        color: cs.onErrorContainer),
+                                  ),
+                                ),
+                                if (tc.filePath != null)
+                                  InkWell(
+                                    onTap: () {
+                                      context
+                                          .read<BuilderCubit>()
+                                          .openFileByPath(tc.filePath!);
+                                      onSwitchToBuilder?.call();
+                                    },
+                                    child: Text(
+                                      'Edit',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: cs.onErrorContainer,
+                                        decoration: TextDecoration.underline,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          )),
+                    ],
+                  ),
+                ),
               // Toolbar
               Padding(
                 padding: const EdgeInsets.all(8),

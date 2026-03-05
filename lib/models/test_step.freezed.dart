@@ -94,6 +94,18 @@ as Map<String, String>,
 
 /// Adds pattern-matching-related methods to [TestStep].
 extension TestStepPatterns on TestStep {
+/// A variant of `map` that fallback to returning `orElse`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
 @optionalTypeArgs TResult maybeMap<TResult extends Object?>(TResult Function( _TestStep value)?  $default,{required TResult orElse(),}){
 final _that = this;
 switch (_that) {
@@ -103,6 +115,18 @@ return $default(_that);case _:
 
 }
 }
+/// A `switch`-like method, using callbacks.
+///
+/// Callbacks receives the raw object, upcasted.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case final Subclass2 value:
+///     return ...;
+/// }
+/// ```
 
 @optionalTypeArgs TResult map<TResult extends Object?>(TResult Function( _TestStep value)  $default,){
 final _that = this;
@@ -113,6 +137,17 @@ return $default(_that);case _:
 
 }
 }
+/// A variant of `map` that fallback to returning `null`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
 
 @optionalTypeArgs TResult? mapOrNull<TResult extends Object?>(TResult? Function( _TestStep value)?  $default,){
 final _that = this;
@@ -123,6 +158,17 @@ return $default(_that);case _:
 
 }
 }
+/// A variant of `when` that fallback to an `orElse` callback.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
 
 @optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String instruction,  String? hint,  String? assertion,  int timeoutSeconds,  int? maxSubSteps,  String? call,  Map<String, String> withVars)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
@@ -132,6 +178,18 @@ return $default(_that.id,_that.instruction,_that.hint,_that.assertion,_that.time
 
 }
 }
+/// A `switch`-like method, using callbacks.
+///
+/// As opposed to `map`, this offers destructuring.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case Subclass2(:final field2):
+///     return ...;
+/// }
+/// ```
 
 @optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String instruction,  String? hint,  String? assertion,  int timeoutSeconds,  int? maxSubSteps,  String? call,  Map<String, String> withVars)  $default,) {final _that = this;
 switch (_that) {
@@ -141,6 +199,17 @@ return $default(_that.id,_that.instruction,_that.hint,_that.assertion,_that.time
 
 }
 }
+/// A variant of `when` that fallback to returning `null`
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
 
 @optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String instruction,  String? hint,  String? assertion,  int timeoutSeconds,  int? maxSubSteps,  String? call,  Map<String, String> withVars)?  $default,) {final _that = this;
 switch (_that) {
@@ -157,20 +226,36 @@ return $default(_that.id,_that.instruction,_that.hint,_that.assertion,_that.time
 @JsonSerializable()
 
 class _TestStep implements TestStep {
-  const _TestStep({required this.id, this.instruction = '', this.hint, this.assertion, this.timeoutSeconds = 30, this.maxSubSteps = null, this.call = null, this.withVars = const {}});
+  const _TestStep({required this.id, this.instruction = '', this.hint, this.assertion, this.timeoutSeconds = 30, this.maxSubSteps = null, this.call = null, final  Map<String, String> withVars = const {}}): _withVars = withVars;
   factory _TestStep.fromJson(Map<String, dynamic> json) => _$TestStepFromJson(json);
 
 @override final  String id;
-@override final  String instruction;
+@override@JsonKey() final  String instruction;
 @override final  String? hint;
 @override final  String? assertion;
 @override@JsonKey() final  int timeoutSeconds;
 /// When set, the step runs as an explore/multi-turn loop.
+/// The LLM will take up to [maxSubSteps] individual actions (click, scroll,
+/// type, navigate, etc.) until it decides the goal is reached (done) or
+/// gives up (fail). Useful for vague navigation instructions like
+/// "go to Company X → Programme Y → Project Z".
 @override@JsonKey() final  int? maxSubSteps;
-/// Path to another YAML test file to run inline as a sub-test.
+/// Path to another YAML test file to run inline as a sub-test (relative
+/// to the calling file's directory). When set, [instruction] is unused.
 @override@JsonKey() final  String? call;
-/// Variable overrides passed into the sub-test.
-@override@JsonKey() final  Map<String, String> withVars;
+/// Variable overrides passed into the sub-test. Merged on top of the
+/// sub-test's own `variables` block, so callers can supply values like
+/// username/password without editing the sub-test file.
+ final  Map<String, String> _withVars;
+/// Variable overrides passed into the sub-test. Merged on top of the
+/// sub-test's own `variables` block, so callers can supply values like
+/// username/password without editing the sub-test file.
+@override@JsonKey() Map<String, String> get withVars {
+  if (_withVars is EqualUnmodifiableMapView) return _withVars;
+  // ignore: implicit_dynamic_type
+  return EqualUnmodifiableMapView(_withVars);
+}
+
 
 /// Create a copy of TestStep
 /// with the given fields replaced by the non-null parameter values.
@@ -185,12 +270,12 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _TestStep&&(identical(other.id, id) || other.id == id)&&(identical(other.instruction, instruction) || other.instruction == instruction)&&(identical(other.hint, hint) || other.hint == hint)&&(identical(other.assertion, assertion) || other.assertion == assertion)&&(identical(other.timeoutSeconds, timeoutSeconds) || other.timeoutSeconds == timeoutSeconds)&&(identical(other.maxSubSteps, maxSubSteps) || other.maxSubSteps == maxSubSteps)&&(identical(other.call, call) || other.call == call)&&const DeepCollectionEquality().equals(other.withVars, withVars));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _TestStep&&(identical(other.id, id) || other.id == id)&&(identical(other.instruction, instruction) || other.instruction == instruction)&&(identical(other.hint, hint) || other.hint == hint)&&(identical(other.assertion, assertion) || other.assertion == assertion)&&(identical(other.timeoutSeconds, timeoutSeconds) || other.timeoutSeconds == timeoutSeconds)&&(identical(other.maxSubSteps, maxSubSteps) || other.maxSubSteps == maxSubSteps)&&(identical(other.call, call) || other.call == call)&&const DeepCollectionEquality().equals(other._withVars, _withVars));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,instruction,hint,assertion,timeoutSeconds,maxSubSteps,call,const DeepCollectionEquality().hash(withVars));
+int get hashCode => Object.hash(runtimeType,id,instruction,hint,assertion,timeoutSeconds,maxSubSteps,call,const DeepCollectionEquality().hash(_withVars));
 
 @override
 String toString() {
@@ -231,7 +316,7 @@ as String?,assertion: freezed == assertion ? _self.assertion : assertion // igno
 as String?,timeoutSeconds: null == timeoutSeconds ? _self.timeoutSeconds : timeoutSeconds // ignore: cast_nullable_to_non_nullable
 as int,maxSubSteps: freezed == maxSubSteps ? _self.maxSubSteps : maxSubSteps // ignore: cast_nullable_to_non_nullable
 as int?,call: freezed == call ? _self.call : call // ignore: cast_nullable_to_non_nullable
-as String?,withVars: null == withVars ? _self.withVars : withVars // ignore: cast_nullable_to_non_nullable
+as String?,withVars: null == withVars ? _self._withVars : withVars // ignore: cast_nullable_to_non_nullable
 as Map<String, String>,
   ));
 }

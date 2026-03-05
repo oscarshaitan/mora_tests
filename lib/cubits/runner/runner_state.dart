@@ -26,6 +26,11 @@ sealed class RunnerState with _$RunnerState {
     String? lastLlmReasoning,
     double? lastLlmConfidence,
     String? lastActionName,
+    // Sub-test progress (non-null while a call step is executing)
+    TestCase? activeSubTest,
+    @Default([]) List<StepResult> completedSubSteps,
+    @Default(0) int subStepIndex,
+    int? totalSubSteps,
   }) = RunnerRunning;
 
   const factory RunnerState.finished({

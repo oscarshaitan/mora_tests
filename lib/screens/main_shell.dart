@@ -62,7 +62,7 @@ class _MainShellState extends State<MainShell> {
                 leading: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   child: Text(
-                    'SYM',
+                    'MORA',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                           color: Theme.of(context).colorScheme.primary,
@@ -74,10 +74,13 @@ class _MainShellState extends State<MainShell> {
               Expanded(
                 child: IndexedStack(
                   index: _selectedIndex,
-                  children: const [
-                    BuilderScreen(),
-                    RunnerScreen(),
-                    SettingsScreen(),
+                  children: [
+                    const BuilderScreen(),
+                    RunnerScreen(
+                      onSwitchToBuilder: () =>
+                          setState(() => _selectedIndex = 0),
+                    ),
+                    const SettingsScreen(),
                   ],
                 ),
               ),

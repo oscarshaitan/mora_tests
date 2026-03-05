@@ -60,6 +60,34 @@ class _TestList extends StatelessWidget {
                 tooltip: 'Open YAML file',
                 onPressed: cubit.openFile,
               ),
+              PopupMenuButton<_ImportOption>(
+                icon: const Icon(Icons.transform_outlined),
+                tooltip: 'Import from Maestro',
+                onSelected: (opt) {
+                  if (opt == _ImportOption.file) cubit.importFromMaestro();
+                  if (opt == _ImportOption.folder) cubit.importFromMaestroFolder();
+                },
+                itemBuilder: (_) => const [
+                  PopupMenuItem(
+                    value: _ImportOption.file,
+                    child: ListTile(
+                      leading: Icon(Icons.insert_drive_file_outlined),
+                      title: Text('Import Maestro file'),
+                      contentPadding: EdgeInsets.zero,
+                      dense: true,
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: _ImportOption.folder,
+                    child: ListTile(
+                      leading: Icon(Icons.folder_copy_outlined),
+                      title: Text('Import Maestro folder'),
+                      contentPadding: EdgeInsets.zero,
+                      dense: true,
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
         ),
@@ -70,6 +98,16 @@ class _TestList extends StatelessWidget {
             itemBuilder: (context, i) {
               final test = state.testCases[i];
               final selected = state.selectedTest?.id == test.id;
+              final incompleteCount = test.steps.where((s) {
+                if (s.call != null) return s.call!.trim().isEmpty;
+                return s.instruction.trim().isEmpty;
+              }).length;
+              final coordCount = test.steps
+                  .where((s) => s.instruction.contains('coordinate '))
+                  .length;
+              final hasIncomplete = incompleteCount > 0;
+              final hasCoordWarning = !hasIncomplete && coordCount > 0;
+              final cs = Theme.of(context).colorScheme;
               return ListTile(
                 selected: selected,
                 title: Text(
@@ -78,9 +116,26 @@ class _TestList extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
                 subtitle: Text(
-                  '${test.steps.length} step${test.steps.length == 1 ? '' : 's'}',
-                  style: const TextStyle(fontSize: 12),
+                  hasIncomplete
+                      ? '$incompleteCount incomplete step${incompleteCount == 1 ? '' : 's'}'
+                      : hasCoordWarning
+                          ? '$coordCount coordinate step${coordCount == 1 ? '' : 's'} need review'
+                          : '${test.steps.length} step${test.steps.length == 1 ? '' : 's'}',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: hasIncomplete
+                        ? cs.error
+                        : hasCoordWarning
+                            ? Colors.amber.shade800
+                            : null,
+                  ),
                 ),
+                leading: hasIncomplete
+                    ? Icon(Icons.error_outline, size: 18, color: cs.error)
+                    : hasCoordWarning
+                        ? Icon(Icons.warning_amber_rounded,
+                            size: 18, color: Colors.amber.shade700)
+                        : null,
                 onTap: () => cubit.selectTest(test),
                 trailing: IconButton(
                   icon: const Icon(Icons.delete_outline, size: 18),
@@ -92,16 +147,64 @@ class _TestList extends StatelessWidget {
         ),
         if (state.errorMessage != null)
           Padding(
-            padding: const EdgeInsets.all(8),
-            child: Text(
-              state.errorMessage!,
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.error,
-                fontSize: 12,
+            padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
+            child: SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Theme.of(context).colorScheme.error,
+                  side: BorderSide(
+                      color: Theme.of(context).colorScheme.error, width: 1),
+                ),
+                icon: const Icon(Icons.warning_amber_rounded, size: 16),
+                label: Text(_issueButtonLabel(state.errorMessage!)),
+                onPressed: () =>
+                    _showIssues(context, state.errorMessage!),
               ),
             ),
           ),
       ],
+    );
+  }
+
+  String _issueButtonLabel(String errorMessage) {
+    final count = '\n'.allMatches(errorMessage).length + 1;
+    return '$count translation issue${count == 1 ? '' : 's'}';
+  }
+
+  void _showIssues(BuildContext context, String errorMessage) {
+    final issues = errorMessage.split('\n');
+    showDialog<void>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.warning_amber_rounded,
+                color: Theme.of(context).colorScheme.error, size: 20),
+            const SizedBox(width: 8),
+            const Text('Translation Issues'),
+          ],
+        ),
+        content: SizedBox(
+          width: 480,
+          child: ListView.separated(
+            shrinkWrap: true,
+            itemCount: issues.length,
+            separatorBuilder: (_, _) => const Divider(height: 1),
+            itemBuilder: (_, i) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Text(issues[i].trim(),
+                  style: const TextStyle(fontSize: 13)),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -129,6 +232,8 @@ class _TestList extends StatelessWidget {
     });
   }
 }
+
+enum _ImportOption { file, folder }
 
 class _EmptyEditor extends StatelessWidget {
   const _EmptyEditor();

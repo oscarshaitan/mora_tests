@@ -19,5 +19,7 @@ abstract class StepResult with _$StepResult {
     String? rawLlmResponse,
     required Duration duration,
     required DateTime executedAt,
+    /// Sub-step results for call steps (populated when step.call != null).
+    @Default([]) List<StepResult> subStepResults,
   }) = _StepResult;
 }

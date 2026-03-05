@@ -10,7 +10,7 @@ _TestCase _$TestCaseFromJson(Map<String, dynamic> json) => _TestCase(
   id: json['id'] as String,
   name: json['name'] as String,
   description: json['description'] as String? ?? '',
-  startUrl: json['startUrl'] as String,
+  startUrl: json['startUrl'] as String? ?? '',
   seeder: json['seeder'] == null
       ? null
       : HttpHook.fromJson(json['seeder'] as Map<String, dynamic>),

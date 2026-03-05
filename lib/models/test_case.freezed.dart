@@ -242,13 +242,13 @@ return $default(_that.id,_that.name,_that.description,_that.startUrl,_that.seede
 @JsonSerializable()
 
 class _TestCase implements TestCase {
-  const _TestCase({required this.id, required this.name, this.description = '', required this.startUrl, this.seeder, this.teardown, final  List<TestStep> steps = const [], final  Map<String, String> variables = const {}, this.status = TestStatus.idle, this.filePath}): _steps = steps,_variables = variables;
+  const _TestCase({required this.id, required this.name, this.description = '', this.startUrl = '', this.seeder, this.teardown, final  List<TestStep> steps = const [], final  Map<String, String> variables = const {}, this.status = TestStatus.idle, this.filePath}): _steps = steps,_variables = variables;
   factory _TestCase.fromJson(Map<String, dynamic> json) => _$TestCaseFromJson(json);
 
 @override final  String id;
 @override final  String name;
 @override@JsonKey() final  String description;
-@override final  String startUrl;
+@override@JsonKey() final  String startUrl;
 @override final  HttpHook? seeder;
 @override final  HttpHook? teardown;
  final  List<TestStep> _steps;

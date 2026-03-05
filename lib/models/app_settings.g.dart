@@ -16,15 +16,15 @@ _AppSettings _$AppSettingsFromJson(Map<String, dynamic> json) => _AppSettings(
       json['ovhFallbackModel'] as String? ?? AppConstants.mistralModel,
   vertexAiBaseUrl:
       json['vertexAiBaseUrl'] as String? ?? AppConstants.vertexAiBaseUrl,
-  vertexAiServiceAccountJson: json['vertexAiServiceAccountJson'] as String? ?? '',
+  vertexAiServiceAccountJson:
+      json['vertexAiServiceAccountJson'] as String? ?? '',
   vertexAiPrimaryModel:
       json['vertexAiPrimaryModel'] as String? ?? AppConstants.geminiFlashModel,
   vertexAiFallbackModel:
       json['vertexAiFallbackModel'] as String? ??
       AppConstants.geminiFlashLiteModel,
   browserHeadless: json['browserHeadless'] as bool? ?? false,
-  confidenceThreshold:
-      (json['confidenceThreshold'] as num?)?.toDouble() ?? 0.5,
+  confidenceThreshold: (json['confidenceThreshold'] as num?)?.toDouble() ?? 0.5,
 );
 
 Map<String, dynamic> _$AppSettingsToJson(_AppSettings instance) =>

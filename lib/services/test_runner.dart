@@ -42,6 +42,12 @@ class TestRunner {
   Future<TestRun> run({
     required TestCase testCase,
     required void Function(StepResult) onStepResult,
+    void Function(
+      TestCase subTest,
+      int subStepIndex,
+      int totalSubSteps,
+      StepResult? completedSubStep,
+    )? onSubTestProgress,
     bool stopOnFirstFailure = true,
   }) async {
     _aborted = false;
@@ -58,10 +64,13 @@ class TestRunner {
 
     // 1. Call seeder
     if (testCase.seeder != null) {
+      dev.log('Seeder: ${testCase.seeder!.method} ${testCase.seeder!.url}',
+          name: 'MoraTests');
       try {
-        await httpHookService.call(testCase.seeder!);
+        final status = await httpHookService.call(testCase.seeder!);
+        dev.log('Seeder completed ✓  HTTP $status', name: 'MoraTests');
       } catch (e) {
-        // Seeder failure is non-fatal — log and continue
+        dev.log('Seeder failed (non-fatal): $e', name: 'MoraTests');
       }
     }
 
@@ -77,9 +86,11 @@ class TestRunner {
     dev.log('═' * 56, name: 'MoraTests');
 
     try {
-      // 2. Navigate to start URL using whatever session state exists.
-      await webViewService.navigate(testCase.startUrl);
-      await Future.delayed(const Duration(seconds: 1));
+      // 2. Navigate to start URL (skip if empty — sub-tests reuse current page).
+      if (testCase.startUrl.isNotEmpty) {
+        await webViewService.navigate(testCase.startUrl);
+        await Future.delayed(const Duration(seconds: 1));
+      }
 
       // 3. Run steps
       for (int i = 0; i < testCase.steps.length; i++) {
@@ -91,6 +102,7 @@ class TestRunner {
           stepNumber: i + 1,
           totalSteps: totalSteps,
           variables: testCase.variables,
+          onSubTestProgress: onSubTestProgress,
         );
 
         onStepResult(result);
@@ -114,23 +126,30 @@ class TestRunner {
 
       // 4. Call teardown hook (e.g. reset DB state)
       if (testCase.teardown != null) {
+        dev.log('Teardown: ${testCase.teardown!.method} ${testCase.teardown!.url}',
+            name: 'MoraTests');
         try {
-          await httpHookService.call(testCase.teardown!);
-        } catch (_) {}
+          final status = await httpHookService.call(testCase.teardown!);
+          dev.log('Teardown completed ✓  HTTP $status', name: 'MoraTests');
+        } catch (e) {
+          dev.log('Teardown failed (non-fatal): $e', name: 'MoraTests');
+        }
       }
 
       // 5. Clean browser state so the next run always starts from a
       //    logged-out baseline: clears cookies, cache, localStorage,
       //    sessionStorage, then reloads to the start URL.
-      dev.log('─' * 56, name: 'MoraTests');
-      dev.log('Cleaning browser state…', name: 'MoraTests');
-      try {
-        await webViewService
-            .navigate(testCase.startUrl, clean: true)
-            .timeout(const Duration(seconds: 40));
-        dev.log('Browser state cleaned ✓', name: 'MoraTests');
-      } catch (e) {
-        dev.log('Browser clean failed (non-fatal): $e', name: 'MoraTests');
+      if (testCase.startUrl.isNotEmpty) {
+        dev.log('─' * 56, name: 'MoraTests');
+        dev.log('Cleaning browser state…', name: 'MoraTests');
+        try {
+          await webViewService
+              .navigate(testCase.startUrl, clean: true)
+              .timeout(const Duration(seconds: 40));
+          dev.log('Browser state cleaned ✓', name: 'MoraTests');
+        } catch (e) {
+          dev.log('Browser clean failed (non-fatal): $e', name: 'MoraTests');
+        }
       }
     }
 
@@ -145,6 +164,7 @@ class TestRunner {
     required Map<String, String> variables,
     required int stepNumber,
     required int totalSteps,
+    void Function(TestCase, int, int, StepResult?)? onSubTestProgress,
   }) async {
     // Call steps run a referenced YAML file inline.
     if (step.call != null) {
@@ -153,6 +173,7 @@ class TestRunner {
         variables: variables,
         stepNumber: stepNumber,
         totalSteps: totalSteps,
+        onSubTestProgress: onSubTestProgress,
       );
     }
 
@@ -289,6 +310,7 @@ class TestRunner {
     required Map<String, String> variables,
     required int stepNumber,
     required int totalSteps,
+    void Function(TestCase, int, int, StepResult?)? onSubTestProgress,
   }) async {
     final stopwatch = Stopwatch()..start();
     final callPath = p.isAbsolute(step.call!)
@@ -332,15 +354,21 @@ class TestRunner {
         name: 'MoraTests');
 
     String? firstFailure;
+    final subResults = <StepResult>[];
     for (int i = 0; i < subTest.steps.length; i++) {
       if (_aborted) break;
       final subStep = subTest.steps[i];
+      // Notify: sub-step i is about to start
+      onSubTestProgress?.call(subTest, i, subStepCount, null);
       final result = await _runStep(
         step: subStep,
         variables: mergedVars,
         stepNumber: i + 1,
         totalSteps: subStepCount,
       );
+      subResults.add(result);
+      // Notify: sub-step i completed
+      onSubTestProgress?.call(subTest, i, subStepCount, result);
       if (!result.success) {
         firstFailure = result.errorMessage ?? 'sub-step ${i + 1} failed';
         break;
@@ -361,6 +389,7 @@ class TestRunner {
           : null,
       duration: stopwatch.elapsed,
       executedAt: DateTime.now(),
+      subStepResults: subResults,
     );
   }
 
@@ -556,10 +585,10 @@ class TestRunner {
   String _interpolate(String text, Map<String, String> variables) {
     var result = text;
     for (final entry in variables.entries) {
-      result = result.replaceAll('{{${entry.key}}}', entry.value);
+      result = result.replaceAll('\${${entry.key}}', entry.value);
     }
-    // Warn if any {{placeholder}} was not resolved — common YAML authoring error.
-    final unresolved = RegExp(r'\{\{[^}]+\}\}').allMatches(result);
+    // Warn if any ${placeholder} was not resolved.
+    final unresolved = RegExp(r'\$\{[^}]+\}').allMatches(result);
     if (unresolved.isNotEmpty) {
       final keys = unresolved.map((m) => m.group(0)).join(', ');
       dev.log('WARNING: unresolved variable(s) in step: $keys', name: 'MoraTests');

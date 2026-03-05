@@ -4,7 +4,7 @@ import '../core/exceptions.dart';
 import '../models/http_hook.dart';
 
 class HttpHookService {
-  Future<void> call(HttpHook hook) async {
+  Future<int> call(HttpHook hook) async {
     try {
       final uri = Uri.parse(hook.url);
       final request = http.Request(hook.method, uri);
@@ -28,6 +28,8 @@ class HttpHookService {
           '${hook.method} ${hook.url} returned ${streamed.statusCode}',
         );
       }
+
+      return streamed.statusCode;
     } on HookException {
       rethrow;
     } catch (e) {

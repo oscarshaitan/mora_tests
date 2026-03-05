@@ -225,7 +225,14 @@ class _RunDetail extends StatelessWidget {
             itemCount: run.results.length,
             itemBuilder: (context, i) {
               final result = run.results[i];
-              return _StepResultCard(index: i, result: result);
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _StepResultCard(index: i, result: result),
+                  if (result.subStepResults.isNotEmpty)
+                    _SubStepResults(results: result.subStepResults),
+                ],
+              );
             },
           ),
         ),
@@ -234,10 +241,44 @@ class _RunDetail extends StatelessWidget {
   }
 }
 
+class _SubStepResults extends StatelessWidget {
+  final List<StepResult> results;
+  const _SubStepResults({required this.results});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(left: 20, bottom: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.subdirectory_arrow_right,
+                  size: 13, color: cs.onSurfaceVariant),
+              const SizedBox(width: 4),
+              Text(
+                '${results.length} sub-step${results.length == 1 ? '' : 's'}',
+                style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          ...results.asMap().entries.map((e) =>
+              _StepResultCard(index: e.key, result: e.value, compact: true)),
+        ],
+      ),
+    );
+  }
+}
+
 class _StepResultCard extends StatefulWidget {
   final int index;
   final StepResult result;
-  const _StepResultCard({required this.index, required this.result});
+  final bool compact;
+  const _StepResultCard(
+      {required this.index, required this.result, this.compact = false});
 
   @override
   State<_StepResultCard> createState() => _StepResultCardState();

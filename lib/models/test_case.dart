@@ -14,7 +14,7 @@ abstract class TestCase with _$TestCase {
     required String id,
     required String name,
     @Default('') String description,
-    required String startUrl,
+    @Default('') String startUrl,
     HttpHook? seeder,
     HttpHook? teardown,
     @Default([]) List<TestStep> steps,

@@ -149,26 +149,53 @@ class RunnerCubit extends Cubit<RunnerState> {
 
       final completedSteps = <StepResult>[];
 
-      final run = await _runner!.run(
-        testCase: testCase,
-        onStepResult: (result) {
-          completedSteps.add(result);
-          final step = testCase.steps.firstWhere(
-            (s) => s.id == result.stepId,
-            orElse: () => testCase.steps.first,
-          );
-          emit(RunnerState.running(
-            currentTest: testCase,
-            completedSteps: List.unmodifiable(completedSteps),
-            activeStep: step,
-            stepIndex: completedSteps.length - 1,
-            totalSteps: testCase.steps.length,
-            lastLlmReasoning: result.actionTaken?.reasoning,
-            lastLlmConfidence: result.actionTaken?.confidence,
-            lastActionName: result.actionTaken?.type.name,
-          ));
-        },
-      );
+      TestRun run;
+      try {
+        run = await _runner!.run(
+          testCase: testCase,
+          onStepResult: (result) {
+            completedSteps.add(result);
+            // stepIndex points to the NEXT step to run (= completedSteps.length),
+            // so that step shows as "running" in the UI while it executes.
+            // This also makes call-step sub-test panels visible.
+            final nextIndex = completedSteps.length
+                .clamp(0, testCase.steps.length - 1);
+            emit(RunnerState.running(
+              currentTest: testCase,
+              completedSteps: List.unmodifiable(completedSteps),
+              activeStep: testCase.steps[nextIndex],
+              stepIndex: nextIndex,
+              totalSteps: testCase.steps.length,
+              lastLlmReasoning: result.actionTaken?.reasoning,
+              lastLlmConfidence: result.actionTaken?.confidence,
+              lastActionName: result.actionTaken?.type.name,
+            ));
+          },
+          onSubTestProgress: (subTest, subStepIndex, totalSubSteps, completedSubStep) {
+            final running = state;
+            if (running is! RunnerRunning) return;
+            if (completedSubStep == null) {
+              // Sub-step is about to start — advance the running index.
+              // Reset completedSubSteps when entering a new sub-test.
+              final isNewSubTest = running.activeSubTest?.id != subTest.id;
+              emit(running.copyWith(
+                activeSubTest: subTest,
+                completedSubSteps: isNewSubTest ? [] : running.completedSubSteps,
+                subStepIndex: subStepIndex,
+                totalSubSteps: totalSubSteps,
+              ));
+            } else {
+              // Sub-step finished — append its result.
+              emit(running.copyWith(
+                completedSubSteps: [...running.completedSubSteps, completedSubStep],
+              ));
+            }
+          },
+        );
+      } catch (e) {
+        emit(RunnerState.error(e.toString()));
+        return;
+      }
 
       final finalRun = run.copyWith(results: completedSteps);
       allRuns.add(finalRun);

@@ -13,9 +13,11 @@ _TestStep _$TestStepFromJson(Map<String, dynamic> json) => _TestStep(
   assertion: json['assertion'] as String?,
   timeoutSeconds: (json['timeoutSeconds'] as num?)?.toInt() ?? 30,
   maxSubSteps: (json['maxSubSteps'] as num?)?.toInt() ?? null,
-  call: json['call'] as String?,
-  withVars: (json['withVars'] as Map<String, dynamic>?)
-          ?.map((k, v) => MapEntry(k, v as String)) ??
+  call: json['call'] as String? ?? null,
+  withVars:
+      (json['withVars'] as Map<String, dynamic>?)?.map(
+        (k, e) => MapEntry(k, e as String),
+      ) ??
       const {},
 );
 

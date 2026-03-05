@@ -88,11 +88,55 @@ class RunView extends StatelessWidget {
                       status = StepCardStatus.pending;
                     }
 
-                    return StepCard(
-                      index: i,
-                      step: step,
-                      status: status,
-                      result: result,
+                    final isActiveCallStep =
+                        status == StepCardStatus.running &&
+                        state.activeSubTest != null;
+
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        StepCard(
+                          index: i,
+                          step: step,
+                          status: status,
+                          result: result,
+                        ),
+                        // Inline sub-steps when this call step is running
+                        if (isActiveCallStep) ...[
+                          _SubTestHeader(
+                              name: state.activeSubTest!.name,
+                              subStepIndex: state.subStepIndex,
+                              total: state.totalSubSteps ??
+                                  state.activeSubTest!.steps.length),
+                          ...List.generate(
+                            state.activeSubTest!.steps.length,
+                            (j) {
+                              final subStep = state.activeSubTest!.steps[j];
+                              StepCardStatus subStatus;
+                              StepResult? subResult;
+                              if (j < state.completedSubSteps.length) {
+                                subResult = state.completedSubSteps[j];
+                                subStatus = subResult.success
+                                    ? StepCardStatus.passed
+                                    : StepCardStatus.failed;
+                              } else if (j == state.subStepIndex) {
+                                subStatus = StepCardStatus.running;
+                              } else {
+                                subStatus = StepCardStatus.pending;
+                              }
+                              return Padding(
+                                padding: const EdgeInsets.only(left: 20),
+                                child: StepCard(
+                                  index: j,
+                                  step: subStep,
+                                  status: subStatus,
+                                  result: subResult,
+                                ),
+                              );
+                            },
+                          ),
+                        ],
+                      ],
                     );
                   },
                 ),
@@ -111,6 +155,39 @@ class RunView extends StatelessWidget {
           child: _WebViewPanel(webViewService: cubit.webViewService),
         ),
       ],
+    );
+  }
+}
+
+class _SubTestHeader extends StatelessWidget {
+  final String name;
+  final int subStepIndex;
+  final int total;
+  const _SubTestHeader(
+      {required this.name, required this.subStepIndex, required this.total});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(left: 20, top: 2, bottom: 2),
+      child: Row(
+        children: [
+          Icon(Icons.subdirectory_arrow_right,
+              size: 14, color: cs.onSurfaceVariant),
+          const SizedBox(width: 4),
+          Text(
+            name,
+            style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            '${subStepIndex + 1}/$total',
+            style: TextStyle(fontSize: 11, color: cs.outline),
+          ),
+        ],
+      ),
     );
   }
 }
