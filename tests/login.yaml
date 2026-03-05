@@ -1,6 +1,10 @@
 id: "ce30d85d-ef92-4ae3-969b-58be36ef5db0"
 name: "Login"
 start_url: "https://symtestclone.web.app"
+seeder:
+  url: "https://europe-west2-symtestclone.cloudfunctions.net/api/seeder/create"
+  method: "POST"
+  timeout: 10
 steps:
   - id: "5d4c5038-65c4-4052-bfe3-fcba0c08f433"
     instruction: "wait until a Login Title is visible"
