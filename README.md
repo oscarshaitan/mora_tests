@@ -10,12 +10,29 @@ Tests are described in natural language YAML files. For each step the app takes 
 
 ---
 
+## Table of Contents
+
+- [Prerequisites](#prerequisites)
+- [Getting Started](#getting-started)
+- [Configuration](#configuration)
+- [YAML Test Format](#yaml-test-format)
+- [Step Types](#step-types)
+- [Explore Mode](#explore-mode)
+- [Sub-test Calls](#sub-test-calls)
+- [How It Works](#how-it-works)
+- [Architecture](#architecture)
+- [Project Structure](#project-structure)
+- [Running Tests](#running-tests)
+- [Troubleshooting](#troubleshooting)
+
+---
+
 ## Prerequisites
 
 ### Flutter
 
-- Flutter SDK ≥ 3.2.0
-- Dart SDK ≥ 3.2.0
+- Flutter SDK >= 3.10.0
+- Dart SDK >= 3.10.0
 
 ### Windows — NuGet CLI (required)
 
@@ -189,7 +206,7 @@ teardown:
   headers:
     Authorization: "Bearer test-token"
 
-# Variables can be referenced in instructions as {{varName}}
+# Variables can be referenced in instructions as ${varName}
 variables:
   username: "testuser@example.com"
   password: "testpass123"
@@ -197,12 +214,12 @@ variables:
 steps:
   # Standard step — one LLM call, one action
   - id: "step-001"
-    instruction: "Type {{username}} into the email input field"
+    instruction: "Type ${username} into the email input field"
     hint: "The field has placeholder 'Email address' and is the first input on the page"
     timeout: 15
 
   - id: "step-002"
-    instruction: "Type {{password}} into the password field"
+    instruction: "Type ${password} into the password field"
     timeout: 15
 
   - id: "step-003"
@@ -237,9 +254,10 @@ steps:
 | `id` | Yes | Unique identifier (UUID recommended) |
 | `name` | Yes | Display name for the test |
 | `start_url` | Yes | URL the WebView navigates to before step 1 |
+| `description` | No | Human-readable description of the test |
 | `seeder` | No | HTTP call made before the test runs |
 | `teardown` | No | HTTP call made after the test finishes (always, even on failure) |
-| `variables` | No | Key-value pairs; use `{{key}}` in instructions |
+| `variables` | No | Key-value pairs; use `${key}` in instructions |
 
 ### Step fields
 
@@ -252,6 +270,80 @@ steps:
 | `max_sub_steps` | No | Enables **Explore mode** — LLM loops up to this many times to reach the goal |
 | `call` | No | Path to another YAML file to run inline as a sub-test (relative to this file) |
 | `with` | No | Variable overrides passed into the sub-test (used with `call`) |
+
+### Seeder / Teardown HTTP hook fields
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `url` | Yes | Full URL to call |
+| `method` | No | HTTP method (default: `POST`) |
+| `headers` | No | Map of header name → value |
+| `body` | No | Raw request body (JSON string) |
+| `timeout` | No | Timeout in seconds (default: 10) |
+
+### Variable interpolation
+
+Variables defined in the `variables` block are substituted into step instructions before the LLM sees them. Use `${variableName}` syntax:
+
+```yaml
+variables:
+  email: "user@example.com"
+  env: "staging"
+
+steps:
+  - instruction: "Navigate to ${env}.myapp.com and log in with ${email}"
+```
+
+Unresolved variables (no matching key in `variables`) are left as-is and logged as warnings.
+
+---
+
+## Step Types
+
+### Standard step
+
+One LLM call, one action executed. Use for discrete interactions: click a button, type a value, scroll to a section.
+
+```yaml
+- id: "step-001"
+  instruction: "Click the Submit button"
+  hint: "Blue button at the bottom of the form"
+  timeout: 20
+```
+
+### Standard step with assertion
+
+After the action, the LLM also checks a condition. If the assertion fails, the step fails.
+
+```yaml
+- id: "step-002"
+  instruction: "Click the Submit button"
+  assert: "A success toast should appear with the message 'Saved'"
+  timeout: 20
+```
+
+### Explore step
+
+Multi-turn: the LLM receives the current screenshot plus a log of sub-steps already taken, and loops until it signals `done` or the sub-step budget is exhausted. Use for navigating menus, filling multi-page forms, or any flow where the exact number of clicks is unpredictable.
+
+```yaml
+- id: "step-003"
+  instruction: "Navigate to Settings > Notifications and enable email alerts"
+  max_sub_steps: 10
+  timeout: 30
+```
+
+### Call step
+
+Runs another YAML file inline as a sub-test. Useful for reusing a login sequence across many tests.
+
+```yaml
+- id: "step-004"
+  call: "shared/login.yaml"
+  with:
+    username: "admin@example.com"
+    password: "secret"
+```
 
 ---
 
@@ -266,6 +358,8 @@ When a step has `max_sub_steps` set, the runner enters a multi-turn loop:
 
 Use explore mode for multi-step flows where the exact number of actions is not known in advance — navigating through menus, filling multi-page forms, or completing any workflow that requires the LLM to reason about intermediate state.
 
+**History capping:** the last 6 sub-step history entries are sent to the LLM to bound token usage while still providing enough context.
+
 **Repeat-type guard:** if the LLM proposes typing the same value that already appears in history, the step immediately succeeds. This handles password fields (which show only dots after typing) and other inputs where visual confirmation is unavailable.
 
 ---
@@ -279,7 +373,7 @@ The `call` field lets a step run another YAML file inline, avoiding duplicated s
 steps:
   - call: shared/login.yaml
     with:
-      username: "{{testUser}}"
+      username: "${testUser}"
       password: "secret123"
   - instruction: "Add the first product to the cart"
 ```
@@ -291,8 +385,8 @@ variables:
   password: ""
 
 steps:
-  - instruction: "Type {{username}} into the email field"
-  - instruction: "Type {{password}} into the password field"
+  - instruction: "Type ${username} into the email field"
+  - instruction: "Type ${password} into the password field"
   - instruction: "Click Sign In"
 ```
 
@@ -343,17 +437,73 @@ This guarantees every test starts from a logged-out baseline regardless of what 
 
 ---
 
-## Branding & Icons
+## Architecture
 
-The app icon (`assets/app_icon.png`) is used as the source for all platform icons (Windows `.ico`, macOS `.icns` sizes). Icons are generated with [`flutter_launcher_icons`](https://pub.dev/packages/flutter_launcher_icons).
-
-To regenerate icons after changing the source image:
-
-```bash
-dart run flutter_launcher_icons
+```
+YAML File
+    │
+    ▼
+StorageService.loadTestCase()       — parses YAML into TestCase model
+    │
+    ▼
+TestRunner.run()
+    ├─ httpHookService.call(seeder)  — optional pre-test HTTP call
+    │
+    ├─ For each step:
+    │   ├─ Standard step
+    │   │   ├─ webViewService.screenshot()
+    │   │   ├─ llmService.interpretStep()  — vision LLM API call
+    │   │   └─ webViewService.executeAction()
+    │   │
+    │   ├─ Explore step (max_sub_steps set)
+    │   │   └─ Loops with growing history until LLM returns "done"
+    │   │
+    │   └─ Call step (call: path/to/sub.yaml)
+    │       └─ Loads sub-test, merges variables, runs inline
+    │
+    └─ httpHookService.call(teardown)  — optional post-test HTTP call
+         webViewService.navigate(clean: true)  — wipe browser state
 ```
 
-The theme palette is derived from the logo's neon-pink-on-deep-purple colour scheme using Material 3 `ColorScheme.fromSeed`.
+### Key components
+
+| Component | File | Responsibility |
+|-----------|------|----------------|
+| `TestRunner` | `lib/services/test_runner.dart` | Orchestrates step execution, explore loops, call steps |
+| `LlmService` | `lib/services/llm_service.dart` | OpenAI-compatible vision API; fallback model; rate-limit retry |
+| `WebViewService` | `lib/services/webview_service.dart` | CDP + JS action dispatch; screenshot; session cleanup |
+| `JsBuilder` | `lib/services/js_builder.dart` | Generates JavaScript strings for each action type |
+| `StorageService` | `lib/services/storage_service.dart` | YAML parsing/saving; run result persistence |
+| `HttpHookService` | `lib/services/http_hook_service.dart` | Seeder / teardown HTTP calls |
+| `BuilderCubit` | `lib/cubits/builder/` | State for the test editor UI |
+| `RunnerCubit` | `lib/cubits/runner/` | State for test execution and live results |
+| `SettingsCubit` | `lib/cubits/settings/` | Provider selection and settings persistence |
+
+### LLM action schema
+
+Every LLM response is a JSON object with this shape:
+
+```json
+{
+  "action": "click",
+  "css_selector": null,
+  "xpath_selector": null,
+  "x": 378,
+  "y": 400,
+  "value": null,
+  "url": null,
+  "key": null,
+  "scroll_delta_x": null,
+  "scroll_delta_y": null,
+  "wait_ms": null,
+  "expected_text": null,
+  "expected_url": null,
+  "confidence": 0.92,
+  "reasoning": "I can see a blue Submit button at the bottom of the form."
+}
+```
+
+The `response_format: {type: json_object}` parameter is sent to the LLM API to force structured JSON output and prevent markdown-fenced responses.
 
 ---
 
@@ -363,33 +513,36 @@ The theme palette is derived from the logo's neon-pink-on-deep-purple colour sch
 assets/
 └── app_icon.png                # source image used to generate all platform icons
 
+docs/
+└── providers.md                # step-by-step provider credential setup
+
 lib/
 ├── main.dart
 ├── injection.dart              # get_it service registration + provider switching
 ├── core/
 │   ├── constants.dart          # LlmProvider enum, default URLs and model names
-│   └── exceptions.dart
+│   └── exceptions.dart         # StorageException, LlmException, HookException
 ├── models/                     # freezed data models
-│   ├── test_case.dart
-│   ├── test_step.dart          # supports call + withVars for sub-test steps
-│   ├── http_hook.dart
-│   ├── llm_action.dart
-│   ├── step_result.dart
-│   ├── test_run.dart
+│   ├── test_case.dart          # id, name, startUrl, seeder, teardown, steps, variables
+│   ├── test_step.dart          # instruction, hint, assert, timeout, maxSubSteps, call, withVars
+│   ├── http_hook.dart          # url, method, headers, body, timeoutSeconds
+│   ├── llm_action.dart         # ActionType enum + LlmAction (x, y, value, key, ...)
+│   ├── step_result.dart        # stepId, success, screenshots, duration, subStepResults
+│   ├── test_run.dart           # id, status, startedAt, finishedAt, results
 │   └── app_settings.dart       # per-provider URL, API key, and model config
 ├── services/
 │   ├── webview_service.dart    # CDP + JS action execution, screenshot, session cleanup
-│   ├── js_builder.dart         # generates JS for assert_* actions
+│   ├── js_builder.dart         # generates JS for each ActionType
 │   ├── llm_service.dart        # OpenAI-compatible vision API (OVH and Vertex AI)
 │   ├── http_hook_service.dart  # seeder / teardown HTTP calls
 │   ├── test_runner.dart        # orchestration (standard, explore, and call-step modes)
 │   └── storage_service.dart    # YAML load/save, run persistence
 ├── cubits/
-│   ├── builder/
-│   ├── runner/
-│   └── settings/
+│   ├── builder/                # BuilderCubit + BuilderState (test editor)
+│   ├── runner/                 # RunnerCubit + RunnerState (execution + live results)
+│   └── settings/               # SettingsCubit + SettingsState (provider config)
 ├── screens/
-│   ├── main_shell.dart
+│   ├── main_shell.dart         # top-level scaffold with tab navigation
 │   ├── builder/
 │   │   ├── builder_screen.dart
 │   │   ├── test_form.dart
@@ -404,7 +557,50 @@ lib/
     ├── screenshot_panel.dart
     ├── test_case_tile.dart
     └── folder_picker_bar.dart
+
+test/
+├── js_builder_test.dart        # unit tests for JsBuilder (all action types)
+├── storage_service_test.dart   # unit tests for YAML parsing and serialization
+└── models_test.dart            # unit tests for model construction and defaults
 ```
+
+---
+
+## Running Tests
+
+Unit tests cover pure logic (JavaScript generation, YAML parsing, model construction) without requiring a running WebView or LLM API.
+
+```bash
+flutter test
+```
+
+Run a single test file:
+
+```bash
+flutter test test/js_builder_test.dart
+flutter test test/storage_service_test.dart
+flutter test test/models_test.dart
+```
+
+Run with verbose output:
+
+```bash
+flutter test --reporter expanded
+```
+
+---
+
+## Branding & Icons
+
+The app icon (`assets/app_icon.png`) is used as the source for all platform icons (Windows `.ico`, macOS `.icns` sizes). Icons are generated with [`flutter_launcher_icons`](https://pub.dev/packages/flutter_launcher_icons).
+
+To regenerate icons after changing the source image:
+
+```bash
+dart run flutter_launcher_icons
+```
+
+The theme palette is derived from the logo's neon-pink-on-deep-purple colour scheme using Material 3 `ColorScheme.fromSeed`.
 
 ---
 
@@ -444,3 +640,7 @@ WebView2 may need a moment to render. The app retries `takeScreenshot()` once af
 ### Test starts already logged in
 
 The session cleanup runs in the `finally` block so it always executes, but it has an 8-second internal timeout and a 40-second outer timeout. If you see a test start in a logged-in state, check the logs for `Browser clean failed` — a slow IndexedDB or service-worker teardown may have timed out. Re-running the suite should resolve it on the next cycle.
+
+### Variables not being substituted
+
+Variables use `${variableName}` syntax (dollar sign + braces), not `{{variableName}}`. Unresolved variables are logged as warnings in the developer console. Check that the variable name in the instruction exactly matches the key in the `variables` block.
