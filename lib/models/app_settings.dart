@@ -19,7 +19,7 @@ abstract class AppSettings with _$AppSettings {
 
     // Vertex AI
     @Default(AppConstants.vertexAiBaseUrl) String vertexAiBaseUrl,
-    @Default('') String vertexAiApiKey,
+    @Default('') String vertexAiServiceAccountJson,
     @Default(AppConstants.geminiFlashModel) String vertexAiPrimaryModel,
     @Default(AppConstants.geminiFlashLiteModel) String vertexAiFallbackModel,
 

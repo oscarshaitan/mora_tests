@@ -15,7 +15,7 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$AppSettings {
 
- String get activeProvider; String get ovhBaseUrl; String get ovhApiKey; String get ovhPrimaryModel; String get ovhFallbackModel; String get vertexAiBaseUrl; String get vertexAiApiKey; String get vertexAiPrimaryModel; String get vertexAiFallbackModel; bool get browserHeadless; double get confidenceThreshold;
+ String get activeProvider; String get ovhBaseUrl; String get ovhApiKey; String get ovhPrimaryModel; String get ovhFallbackModel; String get vertexAiBaseUrl; String get vertexAiServiceAccountJson; String get vertexAiPrimaryModel; String get vertexAiFallbackModel; bool get browserHeadless; double get confidenceThreshold;
 /// Create a copy of AppSettings
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -28,16 +28,16 @@ $AppSettingsCopyWith<AppSettings> get copyWith => _$AppSettingsCopyWithImpl<AppS
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is AppSettings&&(identical(other.activeProvider, activeProvider) || other.activeProvider == activeProvider)&&(identical(other.ovhBaseUrl, ovhBaseUrl) || other.ovhBaseUrl == ovhBaseUrl)&&(identical(other.ovhApiKey, ovhApiKey) || other.ovhApiKey == ovhApiKey)&&(identical(other.ovhPrimaryModel, ovhPrimaryModel) || other.ovhPrimaryModel == ovhPrimaryModel)&&(identical(other.ovhFallbackModel, ovhFallbackModel) || other.ovhFallbackModel == ovhFallbackModel)&&(identical(other.vertexAiBaseUrl, vertexAiBaseUrl) || other.vertexAiBaseUrl == vertexAiBaseUrl)&&(identical(other.vertexAiApiKey, vertexAiApiKey) || other.vertexAiApiKey == vertexAiApiKey)&&(identical(other.vertexAiPrimaryModel, vertexAiPrimaryModel) || other.vertexAiPrimaryModel == vertexAiPrimaryModel)&&(identical(other.vertexAiFallbackModel, vertexAiFallbackModel) || other.vertexAiFallbackModel == vertexAiFallbackModel)&&(identical(other.browserHeadless, browserHeadless) || other.browserHeadless == browserHeadless)&&(identical(other.confidenceThreshold, confidenceThreshold) || other.confidenceThreshold == confidenceThreshold));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is AppSettings&&(identical(other.activeProvider, activeProvider) || other.activeProvider == activeProvider)&&(identical(other.ovhBaseUrl, ovhBaseUrl) || other.ovhBaseUrl == ovhBaseUrl)&&(identical(other.ovhApiKey, ovhApiKey) || other.ovhApiKey == ovhApiKey)&&(identical(other.ovhPrimaryModel, ovhPrimaryModel) || other.ovhPrimaryModel == ovhPrimaryModel)&&(identical(other.ovhFallbackModel, ovhFallbackModel) || other.ovhFallbackModel == ovhFallbackModel)&&(identical(other.vertexAiBaseUrl, vertexAiBaseUrl) || other.vertexAiBaseUrl == vertexAiBaseUrl)&&(identical(other.vertexAiServiceAccountJson, vertexAiServiceAccountJson) || other.vertexAiServiceAccountJson == vertexAiServiceAccountJson)&&(identical(other.vertexAiPrimaryModel, vertexAiPrimaryModel) || other.vertexAiPrimaryModel == vertexAiPrimaryModel)&&(identical(other.vertexAiFallbackModel, vertexAiFallbackModel) || other.vertexAiFallbackModel == vertexAiFallbackModel)&&(identical(other.browserHeadless, browserHeadless) || other.browserHeadless == browserHeadless)&&(identical(other.confidenceThreshold, confidenceThreshold) || other.confidenceThreshold == confidenceThreshold));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,activeProvider,ovhBaseUrl,ovhApiKey,ovhPrimaryModel,ovhFallbackModel,vertexAiBaseUrl,vertexAiApiKey,vertexAiPrimaryModel,vertexAiFallbackModel,browserHeadless,confidenceThreshold);
+int get hashCode => Object.hash(runtimeType,activeProvider,ovhBaseUrl,ovhApiKey,ovhPrimaryModel,ovhFallbackModel,vertexAiBaseUrl,vertexAiServiceAccountJson,vertexAiPrimaryModel,vertexAiFallbackModel,browserHeadless,confidenceThreshold);
 
 @override
 String toString() {
-  return 'AppSettings(activeProvider: $activeProvider, ovhBaseUrl: $ovhBaseUrl, ovhApiKey: $ovhApiKey, ovhPrimaryModel: $ovhPrimaryModel, ovhFallbackModel: $ovhFallbackModel, vertexAiBaseUrl: $vertexAiBaseUrl, vertexAiApiKey: $vertexAiApiKey, vertexAiPrimaryModel: $vertexAiPrimaryModel, vertexAiFallbackModel: $vertexAiFallbackModel, browserHeadless: $browserHeadless, confidenceThreshold: $confidenceThreshold)';
+  return 'AppSettings(activeProvider: $activeProvider, ovhBaseUrl: $ovhBaseUrl, ovhApiKey: $ovhApiKey, ovhPrimaryModel: $ovhPrimaryModel, ovhFallbackModel: $ovhFallbackModel, vertexAiBaseUrl: $vertexAiBaseUrl, vertexAiServiceAccountJson: $vertexAiServiceAccountJson, vertexAiPrimaryModel: $vertexAiPrimaryModel, vertexAiFallbackModel: $vertexAiFallbackModel, browserHeadless: $browserHeadless, confidenceThreshold: $confidenceThreshold)';
 }
 
 
@@ -48,7 +48,7 @@ abstract mixin class $AppSettingsCopyWith<$Res>  {
   factory $AppSettingsCopyWith(AppSettings value, $Res Function(AppSettings) _then) = _$AppSettingsCopyWithImpl;
 @useResult
 $Res call({
- String activeProvider, String ovhBaseUrl, String ovhApiKey, String ovhPrimaryModel, String ovhFallbackModel, String vertexAiBaseUrl, String vertexAiApiKey, String vertexAiPrimaryModel, String vertexAiFallbackModel, bool browserHeadless, double confidenceThreshold
+ String activeProvider, String ovhBaseUrl, String ovhApiKey, String ovhPrimaryModel, String ovhFallbackModel, String vertexAiBaseUrl, String vertexAiServiceAccountJson, String vertexAiPrimaryModel, String vertexAiFallbackModel, bool browserHeadless, double confidenceThreshold
 });
 
 
@@ -65,7 +65,7 @@ class _$AppSettingsCopyWithImpl<$Res>
 
 /// Create a copy of AppSettings
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? activeProvider = null,Object? ovhBaseUrl = null,Object? ovhApiKey = null,Object? ovhPrimaryModel = null,Object? ovhFallbackModel = null,Object? vertexAiBaseUrl = null,Object? vertexAiApiKey = null,Object? vertexAiPrimaryModel = null,Object? vertexAiFallbackModel = null,Object? browserHeadless = null,Object? confidenceThreshold = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? activeProvider = null,Object? ovhBaseUrl = null,Object? ovhApiKey = null,Object? ovhPrimaryModel = null,Object? ovhFallbackModel = null,Object? vertexAiBaseUrl = null,Object? vertexAiServiceAccountJson = null,Object? vertexAiPrimaryModel = null,Object? vertexAiFallbackModel = null,Object? browserHeadless = null,Object? confidenceThreshold = null,}) {
   return _then(_self.copyWith(
 activeProvider: null == activeProvider ? _self.activeProvider : activeProvider // ignore: cast_nullable_to_non_nullable
 as String,ovhBaseUrl: null == ovhBaseUrl ? _self.ovhBaseUrl : ovhBaseUrl // ignore: cast_nullable_to_non_nullable
@@ -73,7 +73,7 @@ as String,ovhApiKey: null == ovhApiKey ? _self.ovhApiKey : ovhApiKey // ignore: 
 as String,ovhPrimaryModel: null == ovhPrimaryModel ? _self.ovhPrimaryModel : ovhPrimaryModel // ignore: cast_nullable_to_non_nullable
 as String,ovhFallbackModel: null == ovhFallbackModel ? _self.ovhFallbackModel : ovhFallbackModel // ignore: cast_nullable_to_non_nullable
 as String,vertexAiBaseUrl: null == vertexAiBaseUrl ? _self.vertexAiBaseUrl : vertexAiBaseUrl // ignore: cast_nullable_to_non_nullable
-as String,vertexAiApiKey: null == vertexAiApiKey ? _self.vertexAiApiKey : vertexAiApiKey // ignore: cast_nullable_to_non_nullable
+as String,vertexAiServiceAccountJson: null == vertexAiServiceAccountJson ? _self.vertexAiServiceAccountJson : vertexAiServiceAccountJson // ignore: cast_nullable_to_non_nullable
 as String,vertexAiPrimaryModel: null == vertexAiPrimaryModel ? _self.vertexAiPrimaryModel : vertexAiPrimaryModel // ignore: cast_nullable_to_non_nullable
 as String,vertexAiFallbackModel: null == vertexAiFallbackModel ? _self.vertexAiFallbackModel : vertexAiFallbackModel // ignore: cast_nullable_to_non_nullable
 as String,browserHeadless: null == browserHeadless ? _self.browserHeadless : browserHeadless // ignore: cast_nullable_to_non_nullable
@@ -118,28 +118,28 @@ return $default(_that);case _:
 }
 }
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String activeProvider,  String ovhBaseUrl,  String ovhApiKey,  String ovhPrimaryModel,  String ovhFallbackModel,  String vertexAiBaseUrl,  String vertexAiApiKey,  String vertexAiPrimaryModel,  String vertexAiFallbackModel,  bool browserHeadless,  double confidenceThreshold)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String activeProvider,  String ovhBaseUrl,  String ovhApiKey,  String ovhPrimaryModel,  String ovhFallbackModel,  String vertexAiBaseUrl,  String vertexAiServiceAccountJson,  String vertexAiPrimaryModel,  String vertexAiFallbackModel,  bool browserHeadless,  double confidenceThreshold)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _AppSettings() when $default != null:
-return $default(_that.activeProvider,_that.ovhBaseUrl,_that.ovhApiKey,_that.ovhPrimaryModel,_that.ovhFallbackModel,_that.vertexAiBaseUrl,_that.vertexAiApiKey,_that.vertexAiPrimaryModel,_that.vertexAiFallbackModel,_that.browserHeadless,_that.confidenceThreshold);case _:
+return $default(_that.activeProvider,_that.ovhBaseUrl,_that.ovhApiKey,_that.ovhPrimaryModel,_that.ovhFallbackModel,_that.vertexAiBaseUrl,_that.vertexAiServiceAccountJson,_that.vertexAiPrimaryModel,_that.vertexAiFallbackModel,_that.browserHeadless,_that.confidenceThreshold);case _:
   return orElse();
 
 }
 }
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String activeProvider,  String ovhBaseUrl,  String ovhApiKey,  String ovhPrimaryModel,  String ovhFallbackModel,  String vertexAiBaseUrl,  String vertexAiApiKey,  String vertexAiPrimaryModel,  String vertexAiFallbackModel,  bool browserHeadless,  double confidenceThreshold)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String activeProvider,  String ovhBaseUrl,  String ovhApiKey,  String ovhPrimaryModel,  String ovhFallbackModel,  String vertexAiBaseUrl,  String vertexAiServiceAccountJson,  String vertexAiPrimaryModel,  String vertexAiFallbackModel,  bool browserHeadless,  double confidenceThreshold)  $default,) {final _that = this;
 switch (_that) {
 case _AppSettings():
-return $default(_that.activeProvider,_that.ovhBaseUrl,_that.ovhApiKey,_that.ovhPrimaryModel,_that.ovhFallbackModel,_that.vertexAiBaseUrl,_that.vertexAiApiKey,_that.vertexAiPrimaryModel,_that.vertexAiFallbackModel,_that.browserHeadless,_that.confidenceThreshold);case _:
+return $default(_that.activeProvider,_that.ovhBaseUrl,_that.ovhApiKey,_that.ovhPrimaryModel,_that.ovhFallbackModel,_that.vertexAiBaseUrl,_that.vertexAiServiceAccountJson,_that.vertexAiPrimaryModel,_that.vertexAiFallbackModel,_that.browserHeadless,_that.confidenceThreshold);case _:
   throw StateError('Unexpected subclass');
 
 }
 }
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String activeProvider,  String ovhBaseUrl,  String ovhApiKey,  String ovhPrimaryModel,  String ovhFallbackModel,  String vertexAiBaseUrl,  String vertexAiApiKey,  String vertexAiPrimaryModel,  String vertexAiFallbackModel,  bool browserHeadless,  double confidenceThreshold)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String activeProvider,  String ovhBaseUrl,  String ovhApiKey,  String ovhPrimaryModel,  String ovhFallbackModel,  String vertexAiBaseUrl,  String vertexAiServiceAccountJson,  String vertexAiPrimaryModel,  String vertexAiFallbackModel,  bool browserHeadless,  double confidenceThreshold)?  $default,) {final _that = this;
 switch (_that) {
 case _AppSettings() when $default != null:
-return $default(_that.activeProvider,_that.ovhBaseUrl,_that.ovhApiKey,_that.ovhPrimaryModel,_that.ovhFallbackModel,_that.vertexAiBaseUrl,_that.vertexAiApiKey,_that.vertexAiPrimaryModel,_that.vertexAiFallbackModel,_that.browserHeadless,_that.confidenceThreshold);case _:
+return $default(_that.activeProvider,_that.ovhBaseUrl,_that.ovhApiKey,_that.ovhPrimaryModel,_that.ovhFallbackModel,_that.vertexAiBaseUrl,_that.vertexAiServiceAccountJson,_that.vertexAiPrimaryModel,_that.vertexAiFallbackModel,_that.browserHeadless,_that.confidenceThreshold);case _:
   return null;
 
 }
@@ -151,7 +151,7 @@ return $default(_that.activeProvider,_that.ovhBaseUrl,_that.ovhApiKey,_that.ovhP
 @JsonSerializable()
 
 class _AppSettings implements AppSettings {
-  const _AppSettings({this.activeProvider = 'ovh', this.ovhBaseUrl = AppConstants.defaultLlmBaseUrl, this.ovhApiKey = '', this.ovhPrimaryModel = AppConstants.defaultLlmModel, this.ovhFallbackModel = AppConstants.mistralModel, this.vertexAiBaseUrl = AppConstants.vertexAiBaseUrl, this.vertexAiApiKey = '', this.vertexAiPrimaryModel = AppConstants.geminiFlashModel, this.vertexAiFallbackModel = AppConstants.geminiFlashLiteModel, this.browserHeadless = false, this.confidenceThreshold = 0.5});
+  const _AppSettings({this.activeProvider = 'ovh', this.ovhBaseUrl = AppConstants.defaultLlmBaseUrl, this.ovhApiKey = '', this.ovhPrimaryModel = AppConstants.defaultLlmModel, this.ovhFallbackModel = AppConstants.mistralModel, this.vertexAiBaseUrl = AppConstants.vertexAiBaseUrl, this.vertexAiServiceAccountJson = '', this.vertexAiPrimaryModel = AppConstants.geminiFlashModel, this.vertexAiFallbackModel = AppConstants.geminiFlashLiteModel, this.browserHeadless = false, this.confidenceThreshold = 0.5});
   factory _AppSettings.fromJson(Map<String, dynamic> json) => _$AppSettingsFromJson(json);
 
 @override@JsonKey() final  String activeProvider;
@@ -160,7 +160,7 @@ class _AppSettings implements AppSettings {
 @override@JsonKey() final  String ovhPrimaryModel;
 @override@JsonKey() final  String ovhFallbackModel;
 @override@JsonKey() final  String vertexAiBaseUrl;
-@override@JsonKey() final  String vertexAiApiKey;
+@override@JsonKey() final  String vertexAiServiceAccountJson;
 @override@JsonKey() final  String vertexAiPrimaryModel;
 @override@JsonKey() final  String vertexAiFallbackModel;
 @override@JsonKey() final  bool browserHeadless;
@@ -179,16 +179,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _AppSettings&&(identical(other.activeProvider, activeProvider) || other.activeProvider == activeProvider)&&(identical(other.ovhBaseUrl, ovhBaseUrl) || other.ovhBaseUrl == ovhBaseUrl)&&(identical(other.ovhApiKey, ovhApiKey) || other.ovhApiKey == ovhApiKey)&&(identical(other.ovhPrimaryModel, ovhPrimaryModel) || other.ovhPrimaryModel == ovhPrimaryModel)&&(identical(other.ovhFallbackModel, ovhFallbackModel) || other.ovhFallbackModel == ovhFallbackModel)&&(identical(other.vertexAiBaseUrl, vertexAiBaseUrl) || other.vertexAiBaseUrl == vertexAiBaseUrl)&&(identical(other.vertexAiApiKey, vertexAiApiKey) || other.vertexAiApiKey == vertexAiApiKey)&&(identical(other.vertexAiPrimaryModel, vertexAiPrimaryModel) || other.vertexAiPrimaryModel == vertexAiPrimaryModel)&&(identical(other.vertexAiFallbackModel, vertexAiFallbackModel) || other.vertexAiFallbackModel == vertexAiFallbackModel)&&(identical(other.browserHeadless, browserHeadless) || other.browserHeadless == browserHeadless)&&(identical(other.confidenceThreshold, confidenceThreshold) || other.confidenceThreshold == confidenceThreshold));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _AppSettings&&(identical(other.activeProvider, activeProvider) || other.activeProvider == activeProvider)&&(identical(other.ovhBaseUrl, ovhBaseUrl) || other.ovhBaseUrl == ovhBaseUrl)&&(identical(other.ovhApiKey, ovhApiKey) || other.ovhApiKey == ovhApiKey)&&(identical(other.ovhPrimaryModel, ovhPrimaryModel) || other.ovhPrimaryModel == ovhPrimaryModel)&&(identical(other.ovhFallbackModel, ovhFallbackModel) || other.ovhFallbackModel == ovhFallbackModel)&&(identical(other.vertexAiBaseUrl, vertexAiBaseUrl) || other.vertexAiBaseUrl == vertexAiBaseUrl)&&(identical(other.vertexAiServiceAccountJson, vertexAiServiceAccountJson) || other.vertexAiServiceAccountJson == vertexAiServiceAccountJson)&&(identical(other.vertexAiPrimaryModel, vertexAiPrimaryModel) || other.vertexAiPrimaryModel == vertexAiPrimaryModel)&&(identical(other.vertexAiFallbackModel, vertexAiFallbackModel) || other.vertexAiFallbackModel == vertexAiFallbackModel)&&(identical(other.browserHeadless, browserHeadless) || other.browserHeadless == browserHeadless)&&(identical(other.confidenceThreshold, confidenceThreshold) || other.confidenceThreshold == confidenceThreshold));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,activeProvider,ovhBaseUrl,ovhApiKey,ovhPrimaryModel,ovhFallbackModel,vertexAiBaseUrl,vertexAiApiKey,vertexAiPrimaryModel,vertexAiFallbackModel,browserHeadless,confidenceThreshold);
+int get hashCode => Object.hash(runtimeType,activeProvider,ovhBaseUrl,ovhApiKey,ovhPrimaryModel,ovhFallbackModel,vertexAiBaseUrl,vertexAiServiceAccountJson,vertexAiPrimaryModel,vertexAiFallbackModel,browserHeadless,confidenceThreshold);
 
 @override
 String toString() {
-  return 'AppSettings(activeProvider: $activeProvider, ovhBaseUrl: $ovhBaseUrl, ovhApiKey: $ovhApiKey, ovhPrimaryModel: $ovhPrimaryModel, ovhFallbackModel: $ovhFallbackModel, vertexAiBaseUrl: $vertexAiBaseUrl, vertexAiApiKey: $vertexAiApiKey, vertexAiPrimaryModel: $vertexAiPrimaryModel, vertexAiFallbackModel: $vertexAiFallbackModel, browserHeadless: $browserHeadless, confidenceThreshold: $confidenceThreshold)';
+  return 'AppSettings(activeProvider: $activeProvider, ovhBaseUrl: $ovhBaseUrl, ovhApiKey: $ovhApiKey, ovhPrimaryModel: $ovhPrimaryModel, ovhFallbackModel: $ovhFallbackModel, vertexAiBaseUrl: $vertexAiBaseUrl, vertexAiServiceAccountJson: $vertexAiServiceAccountJson, vertexAiPrimaryModel: $vertexAiPrimaryModel, vertexAiFallbackModel: $vertexAiFallbackModel, browserHeadless: $browserHeadless, confidenceThreshold: $confidenceThreshold)';
 }
 
 
@@ -199,7 +199,7 @@ abstract mixin class _$AppSettingsCopyWith<$Res> implements $AppSettingsCopyWith
   factory _$AppSettingsCopyWith(_AppSettings value, $Res Function(_AppSettings) _then) = __$AppSettingsCopyWithImpl;
 @override @useResult
 $Res call({
- String activeProvider, String ovhBaseUrl, String ovhApiKey, String ovhPrimaryModel, String ovhFallbackModel, String vertexAiBaseUrl, String vertexAiApiKey, String vertexAiPrimaryModel, String vertexAiFallbackModel, bool browserHeadless, double confidenceThreshold
+ String activeProvider, String ovhBaseUrl, String ovhApiKey, String ovhPrimaryModel, String ovhFallbackModel, String vertexAiBaseUrl, String vertexAiServiceAccountJson, String vertexAiPrimaryModel, String vertexAiFallbackModel, bool browserHeadless, double confidenceThreshold
 });
 
 
@@ -216,7 +216,7 @@ class __$AppSettingsCopyWithImpl<$Res>
 
 /// Create a copy of AppSettings
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? activeProvider = null,Object? ovhBaseUrl = null,Object? ovhApiKey = null,Object? ovhPrimaryModel = null,Object? ovhFallbackModel = null,Object? vertexAiBaseUrl = null,Object? vertexAiApiKey = null,Object? vertexAiPrimaryModel = null,Object? vertexAiFallbackModel = null,Object? browserHeadless = null,Object? confidenceThreshold = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? activeProvider = null,Object? ovhBaseUrl = null,Object? ovhApiKey = null,Object? ovhPrimaryModel = null,Object? ovhFallbackModel = null,Object? vertexAiBaseUrl = null,Object? vertexAiServiceAccountJson = null,Object? vertexAiPrimaryModel = null,Object? vertexAiFallbackModel = null,Object? browserHeadless = null,Object? confidenceThreshold = null,}) {
   return _then(_AppSettings(
 activeProvider: null == activeProvider ? _self.activeProvider : activeProvider // ignore: cast_nullable_to_non_nullable
 as String,ovhBaseUrl: null == ovhBaseUrl ? _self.ovhBaseUrl : ovhBaseUrl // ignore: cast_nullable_to_non_nullable
@@ -224,7 +224,7 @@ as String,ovhApiKey: null == ovhApiKey ? _self.ovhApiKey : ovhApiKey // ignore: 
 as String,ovhPrimaryModel: null == ovhPrimaryModel ? _self.ovhPrimaryModel : ovhPrimaryModel // ignore: cast_nullable_to_non_nullable
 as String,ovhFallbackModel: null == ovhFallbackModel ? _self.ovhFallbackModel : ovhFallbackModel // ignore: cast_nullable_to_non_nullable
 as String,vertexAiBaseUrl: null == vertexAiBaseUrl ? _self.vertexAiBaseUrl : vertexAiBaseUrl // ignore: cast_nullable_to_non_nullable
-as String,vertexAiApiKey: null == vertexAiApiKey ? _self.vertexAiApiKey : vertexAiApiKey // ignore: cast_nullable_to_non_nullable
+as String,vertexAiServiceAccountJson: null == vertexAiServiceAccountJson ? _self.vertexAiServiceAccountJson : vertexAiServiceAccountJson // ignore: cast_nullable_to_non_nullable
 as String,vertexAiPrimaryModel: null == vertexAiPrimaryModel ? _self.vertexAiPrimaryModel : vertexAiPrimaryModel // ignore: cast_nullable_to_non_nullable
 as String,vertexAiFallbackModel: null == vertexAiFallbackModel ? _self.vertexAiFallbackModel : vertexAiFallbackModel // ignore: cast_nullable_to_non_nullable
 as String,browserHeadless: null == browserHeadless ? _self.browserHeadless : browserHeadless // ignore: cast_nullable_to_non_nullable

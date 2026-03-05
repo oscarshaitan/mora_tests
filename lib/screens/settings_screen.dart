@@ -1,5 +1,8 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:file_picker/file_picker.dart';
 
 import '../core/constants.dart';
 import '../cubits/settings/settings_cubit.dart';
@@ -12,12 +15,14 @@ import '../cubits/settings/settings_state.dart';
 class _ProviderConfig {
   String baseUrl;
   String apiKey;
+  String serviceAccountJson;
   String primaryModel;
   String fallbackModel;
 
   _ProviderConfig({
     required this.baseUrl,
-    required this.apiKey,
+    this.apiKey = '',
+    this.serviceAccountJson = '',
     required this.primaryModel,
     required this.fallbackModel,
   });
@@ -53,7 +58,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
     _vertexConfig = _ProviderConfig(
       baseUrl: s.vertexAiBaseUrl,
-      apiKey: s.vertexAiApiKey,
+      serviceAccountJson: s.vertexAiServiceAccountJson,
       primaryModel: s.vertexAiPrimaryModel,
       fallbackModel: s.vertexAiFallbackModel,
     );
@@ -74,8 +79,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         fallbackModelHint: isVertex
             ? AppConstants.geminiFlashLiteModel
             : AppConstants.mistralModel,
-        apiKeyLabel: isVertex ? 'Access Token (Google OAuth2)' : 'API Key',
-        vertexHint: isVertex,
+        isVertex: isVertex,
       ),
     );
 
@@ -100,7 +104,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ovhPrimaryModel: _ovhConfig.primaryModel,
       ovhFallbackModel: _ovhConfig.fallbackModel,
       vertexAiBaseUrl: _vertexConfig.baseUrl,
-      vertexAiApiKey: _vertexConfig.apiKey,
+      vertexAiServiceAccountJson: _vertexConfig.serviceAccountJson,
       vertexAiPrimaryModel: _vertexConfig.primaryModel,
       vertexAiFallbackModel: _vertexConfig.fallbackModel,
     ));
@@ -289,16 +293,14 @@ class _ProviderSettingsDialog extends StatefulWidget {
   final _ProviderConfig config;
   final String primaryModelHint;
   final String fallbackModelHint;
-  final String apiKeyLabel;
-  final bool vertexHint;
+  final bool isVertex;
 
   const _ProviderSettingsDialog({
     required this.title,
     required this.config,
     required this.primaryModelHint,
     required this.fallbackModelHint,
-    required this.apiKeyLabel,
-    this.vertexHint = false,
+    this.isVertex = false,
   });
 
   @override
@@ -309,6 +311,7 @@ class _ProviderSettingsDialog extends StatefulWidget {
 class _ProviderSettingsDialogState extends State<_ProviderSettingsDialog> {
   late TextEditingController _baseUrlCtrl;
   late TextEditingController _apiKeyCtrl;
+  late TextEditingController _serviceAccountJsonCtrl;
   late TextEditingController _primaryModelCtrl;
   late TextEditingController _fallbackModelCtrl;
 
@@ -317,6 +320,8 @@ class _ProviderSettingsDialogState extends State<_ProviderSettingsDialog> {
     super.initState();
     _baseUrlCtrl = TextEditingController(text: widget.config.baseUrl);
     _apiKeyCtrl = TextEditingController(text: widget.config.apiKey);
+    _serviceAccountJsonCtrl =
+        TextEditingController(text: widget.config.serviceAccountJson);
     _primaryModelCtrl =
         TextEditingController(text: widget.config.primaryModel);
     _fallbackModelCtrl =
@@ -327,6 +332,7 @@ class _ProviderSettingsDialogState extends State<_ProviderSettingsDialog> {
   void dispose() {
     _baseUrlCtrl.dispose();
     _apiKeyCtrl.dispose();
+    _serviceAccountJsonCtrl.dispose();
     _primaryModelCtrl.dispose();
     _fallbackModelCtrl.dispose();
     super.dispose();
@@ -343,7 +349,7 @@ class _ProviderSettingsDialogState extends State<_ProviderSettingsDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (widget.vertexHint)
+              if (widget.isVertex)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 12),
                   child: Text(
@@ -359,14 +365,53 @@ class _ProviderSettingsDialogState extends State<_ProviderSettingsDialog> {
                 ),
               ),
               const SizedBox(height: 12),
-              TextFormField(
-                controller: _apiKeyCtrl,
-                obscureText: true,
-                decoration: InputDecoration(
-                  labelText: widget.apiKeyLabel,
-                  border: const OutlineInputBorder(),
+              if (widget.isVertex) ...[
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text('Service Account JSON',
+                          style: Theme.of(context).textTheme.labelLarge),
+                    ),
+                    TextButton.icon(
+                      icon: const Icon(Icons.folder_open_outlined, size: 16),
+                      label: const Text('Load file'),
+                      onPressed: () async {
+                        final result = await FilePicker.platform.pickFiles(
+                          type: FileType.custom,
+                          allowedExtensions: ['json'],
+                          dialogTitle: 'Select service account JSON key',
+                        );
+                        final path = result?.files.single.path;
+                        if (path != null) {
+                          final content = await File(path).readAsString();
+                          setState(
+                              () => _serviceAccountJsonCtrl.text = content);
+                        }
+                      },
+                    ),
+                  ],
                 ),
-              ),
+                const SizedBox(height: 4),
+                TextFormField(
+                  controller: _serviceAccountJsonCtrl,
+                  decoration: const InputDecoration(
+                    hintText: '{ "type": "service_account", ... }',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                  minLines: 5,
+                  maxLines: 10,
+                  style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+                ),
+              ] else
+                TextFormField(
+                  controller: _apiKeyCtrl,
+                  obscureText: true,
+                  decoration: const InputDecoration(
+                    labelText: 'API Key',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
               const SizedBox(height: 20),
               Text('Models', style: Theme.of(context).textTheme.titleSmall),
               const SizedBox(height: 8),
@@ -400,7 +445,10 @@ class _ProviderSettingsDialogState extends State<_ProviderSettingsDialog> {
           onPressed: () => Navigator.of(context).pop(
             _ProviderConfig(
               baseUrl: _baseUrlCtrl.text.trim(),
-              apiKey: _apiKeyCtrl.text.trim(),
+              apiKey: widget.isVertex ? '' : _apiKeyCtrl.text.trim(),
+              serviceAccountJson: widget.isVertex
+                  ? _serviceAccountJsonCtrl.text.trim()
+                  : '',
               primaryModel: _primaryModelCtrl.text.trim(),
               fallbackModel: _fallbackModelCtrl.text.trim(),
             ),

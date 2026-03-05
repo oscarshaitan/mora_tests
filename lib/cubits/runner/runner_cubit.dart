@@ -144,6 +144,7 @@ class RunnerCubit extends Cubit<RunnerState> {
         webViewService: webViewService,
         llmService: sl<LlmService>(),
         httpHookService: sl<HttpHookService>(),
+        storageService: _storage,
       );
 
       final completedSteps = <StepResult>[];

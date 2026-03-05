@@ -1,9 +1,12 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../cubits/builder/builder_cubit.dart';
 import '../../models/test_case.dart';
 import '../../models/test_step.dart';
+
+enum _StepMode { normal, explore, call }
 
 class StepListEditor extends StatelessWidget {
   final TestCase test;
@@ -66,95 +69,125 @@ class _StepCard extends StatefulWidget {
 }
 
 class _StepCardState extends State<_StepCard> {
+  late _StepMode _mode;
   late TextEditingController _instructionCtrl;
   late TextEditingController _hintCtrl;
   late TextEditingController _assertCtrl;
   late TextEditingController _timeoutCtrl;
   late TextEditingController _subStepsCtrl;
-  late bool _exploreMode;
+  late TextEditingController _callCtrl;
+  late List<_WithVarEntry> _withVarsEntries;
 
   @override
   void initState() {
     super.initState();
-    _exploreMode = widget.step.maxSubSteps != null;
-    _instructionCtrl =
-        TextEditingController(text: widget.step.instruction);
-    _hintCtrl = TextEditingController(text: widget.step.hint ?? '');
-    _assertCtrl = TextEditingController(text: widget.step.assertion ?? '');
-    _timeoutCtrl =
-        TextEditingController(text: widget.step.timeoutSeconds.toString());
-    _subStepsCtrl = TextEditingController(
-        text: (widget.step.maxSubSteps ?? 10).toString());
+    _initFrom(widget.step);
+  }
+
+  void _initFrom(TestStep step) {
+    if (step.call != null) {
+      _mode = _StepMode.call;
+    } else if (step.maxSubSteps != null) {
+      _mode = _StepMode.explore;
+    } else {
+      _mode = _StepMode.normal;
+    }
+    _instructionCtrl = TextEditingController(text: step.instruction);
+    _hintCtrl = TextEditingController(text: step.hint ?? '');
+    _assertCtrl = TextEditingController(text: step.assertion ?? '');
+    _timeoutCtrl = TextEditingController(text: step.timeoutSeconds.toString());
+    _subStepsCtrl =
+        TextEditingController(text: (step.maxSubSteps ?? 10).toString());
+    _callCtrl = TextEditingController(text: step.call ?? '');
+    _withVarsEntries = step.withVars.entries
+        .map((e) => _WithVarEntry(
+              keyCtrl: TextEditingController(text: e.key),
+              valCtrl: TextEditingController(text: e.value),
+            ))
+        .toList();
+  }
+
+  void _disposeControllers() {
+    _instructionCtrl.dispose();
+    _hintCtrl.dispose();
+    _assertCtrl.dispose();
+    _timeoutCtrl.dispose();
+    _subStepsCtrl.dispose();
+    _callCtrl.dispose();
+    for (final e in _withVarsEntries) {
+      e.keyCtrl.dispose();
+      e.valCtrl.dispose();
+    }
   }
 
   @override
   void didUpdateWidget(_StepCard old) {
     super.didUpdateWidget(old);
     if (old.step.id != widget.step.id) {
-      _exploreMode = widget.step.maxSubSteps != null;
-      _instructionCtrl.text = widget.step.instruction;
-      _hintCtrl.text = widget.step.hint ?? '';
-      _assertCtrl.text = widget.step.assertion ?? '';
-      _timeoutCtrl.text = widget.step.timeoutSeconds.toString();
-      _subStepsCtrl.text = (widget.step.maxSubSteps ?? 10).toString();
+      _disposeControllers();
+      _initFrom(widget.step);
     }
   }
 
   @override
   void dispose() {
-    _instructionCtrl.dispose();
-    _hintCtrl.dispose();
-    _assertCtrl.dispose();
-    _timeoutCtrl.dispose();
-    _subStepsCtrl.dispose();
+    _disposeControllers();
     super.dispose();
   }
 
   void _notify() {
     widget.onChanged(widget.step.copyWith(
-      instruction: _instructionCtrl.text,
-      hint: _hintCtrl.text.isEmpty ? null : _hintCtrl.text,
-      assertion: _assertCtrl.text.isEmpty ? null : _assertCtrl.text,
+      instruction: _mode == _StepMode.call ? '' : _instructionCtrl.text,
+      hint: _mode == _StepMode.call || _hintCtrl.text.isEmpty
+          ? null
+          : _hintCtrl.text,
+      assertion: _mode == _StepMode.call || _assertCtrl.text.isEmpty
+          ? null
+          : _assertCtrl.text,
       timeoutSeconds: int.tryParse(_timeoutCtrl.text) ?? 30,
       maxSubSteps:
-          _exploreMode ? (int.tryParse(_subStepsCtrl.text) ?? 10) : null,
+          _mode == _StepMode.explore ? (int.tryParse(_subStepsCtrl.text) ?? 10) : null,
+      call: _mode == _StepMode.call
+          ? (_callCtrl.text.isEmpty ? null : _callCtrl.text)
+          : null,
+      withVars: _mode == _StepMode.call
+          ? {
+              for (final e in _withVarsEntries)
+                if (e.keyCtrl.text.isNotEmpty) e.keyCtrl.text: e.valCtrl.text,
+            }
+          : const {},
     ));
   }
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8),
-        side: BorderSide(
-          color: Theme.of(context).colorScheme.outlineVariant,
-        ),
+        side: BorderSide(color: colorScheme.outlineVariant),
       ),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(12, 8, 12, 14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // ── Header row ────────────────────────────────────────────
             Row(
               children: [
                 ReorderableDragStartListener(
                   index: widget.index,
                   child: MouseRegion(
                     cursor: SystemMouseCursors.grab,
-                    child: Icon(
-                      Icons.drag_handle,
-                      size: 20,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
+                    child: Icon(Icons.drag_handle,
+                        size: 20, color: colorScheme.onSurfaceVariant),
                   ),
                 ),
                 const SizedBox(width: 8),
-                Text(
-                  'Step ${widget.index + 1}',
-                  style: Theme.of(context).textTheme.titleSmall,
-                ),
+                Text('Step ${widget.index + 1}',
+                    style: Theme.of(context).textTheme.titleSmall),
                 const Spacer(),
                 IconButton(
                   icon: const Icon(Icons.close, size: 18),
@@ -163,97 +196,86 @@ class _StepCardState extends State<_StepCard> {
                 ),
               ],
             ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _instructionCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Instruction *',
-                border: OutlineInputBorder(),
-                isDense: true,
+            const SizedBox(height: 10),
+
+            // ── Mode selector ─────────────────────────────────────────
+            SegmentedButton<_StepMode>(
+              segments: const [
+                ButtonSegment(
+                  value: _StepMode.normal,
+                  label: Text('Normal'),
+                  icon: Icon(Icons.play_arrow_outlined, size: 16),
+                ),
+                ButtonSegment(
+                  value: _StepMode.explore,
+                  label: Text('Explore'),
+                  icon: Icon(Icons.explore_outlined, size: 16),
+                ),
+                ButtonSegment(
+                  value: _StepMode.call,
+                  label: Text('Call sub-test'),
+                  icon: Icon(Icons.call_merge, size: 16),
+                ),
+              ],
+              selected: {_mode},
+              onSelectionChanged: (s) {
+                setState(() => _mode = s.first);
+                _notify();
+              },
+              style: const ButtonStyle(
+                visualDensity: VisualDensity.compact,
               ),
-              minLines: 1,
-              maxLines: null,
-              onChanged: (_) => _notify(),
             ),
             const SizedBox(height: 14),
-            TextFormField(
-              controller: _hintCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Hint (optional — helps LLM identify elements)',
-                border: OutlineInputBorder(),
-                isDense: true,
-              ),
-              minLines: 1,
-              maxLines: null,
-              onChanged: (_) => _notify(),
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _assertCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Assert (optional — condition to verify after action)',
-                border: OutlineInputBorder(),
-                isDense: true,
-              ),
-              minLines: 1,
-              maxLines: null,
-              onChanged: (_) => _notify(),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                SizedBox(
-                  width: 120,
-                  child: TextFormField(
-                    controller: _timeoutCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Timeout (sec)',
-                      border: OutlineInputBorder(),
-                      isDense: true,
-                    ),
-                    keyboardType: TextInputType.number,
-                    onChanged: (_) => _notify(),
-                  ),
+
+            // ── Normal / Explore fields ────────────────────────────────
+            if (_mode != _StepMode.call) ...[
+              TextFormField(
+                controller: _instructionCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Instruction *',
+                  border: OutlineInputBorder(),
+                  isDense: true,
                 ),
-                const SizedBox(width: 16),
-                // ── Explore mode toggle ──────────────────────────────────
-                InkWell(
-                  borderRadius: BorderRadius.circular(6),
-                  onTap: () {
-                    setState(() => _exploreMode = !_exploreMode);
-                    _notify();
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 6, vertical: 4),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Switch(
-                          value: _exploreMode,
-                          materialTapTargetSize:
-                              MaterialTapTargetSize.shrinkWrap,
-                          onChanged: (v) {
-                            setState(() => _exploreMode = v);
-                            _notify();
-                          },
-                        ),
-                        const SizedBox(width: 4),
-                        const Text('Explore mode'),
-                      ],
-                    ),
-                  ),
+                minLines: 1,
+                maxLines: null,
+                onChanged: (_) => _notify(),
+              ),
+              const SizedBox(height: 14),
+              TextFormField(
+                controller: _hintCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Hint (optional — helps LLM identify elements)',
+                  border: OutlineInputBorder(),
+                  isDense: true,
                 ),
-                // Sub-steps count — only shown when explore mode is on
-                if (_exploreMode) ...[
-                  const SizedBox(width: 12),
+                minLines: 1,
+                maxLines: null,
+                onChanged: (_) => _notify(),
+              ),
+              const SizedBox(height: 14),
+              TextFormField(
+                controller: _assertCtrl,
+                decoration: const InputDecoration(
+                  labelText:
+                      'Assert (optional — condition to verify after action)',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+                minLines: 1,
+                maxLines: null,
+                onChanged: (_) => _notify(),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
                   SizedBox(
-                    width: 90,
+                    width: 120,
                     child: TextFormField(
-                      controller: _subStepsCtrl,
+                      controller: _timeoutCtrl,
                       decoration: const InputDecoration(
-                        labelText: 'Sub-steps',
+                        labelText: 'Timeout (sec)',
                         border: OutlineInputBorder(),
                         isDense: true,
                       ),
@@ -261,12 +283,153 @@ class _StepCardState extends State<_StepCard> {
                       onChanged: (_) => _notify(),
                     ),
                   ),
+                  if (_mode == _StepMode.explore) ...[
+                    const SizedBox(width: 16),
+                    SizedBox(
+                      width: 100,
+                      child: TextFormField(
+                        controller: _subStepsCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Max sub-steps',
+                          border: OutlineInputBorder(),
+                          isDense: true,
+                        ),
+                        keyboardType: TextInputType.number,
+                        onChanged: (_) => _notify(),
+                      ),
+                    ),
+                  ],
                 ],
-              ],
-            ),
+              ),
+            ],
+
+            // ── Call sub-test fields ───────────────────────────────────
+            if (_mode == _StepMode.call) ...[
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _callCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'YAML file path (relative to this file)',
+                        hintText: 'shared/login.yaml',
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                        prefixIcon:
+                            Icon(Icons.insert_drive_file_outlined, size: 18),
+                      ),
+                      onChanged: (_) => _notify(),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    tooltip: 'Browse for YAML file',
+                    icon: const Icon(Icons.folder_open_outlined),
+                    onPressed: () async {
+                      final result = await FilePicker.platform.pickFiles(
+                        type: FileType.custom,
+                        allowedExtensions: ['yaml'],
+                        dialogTitle: 'Select sub-test YAML',
+                      );
+                      final path = result?.files.single.path;
+                      if (path != null) {
+                        setState(() => _callCtrl.text = path);
+                        _notify();
+                      }
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+
+              // ── withVars editor ──────────────────────────────────────
+              Row(
+                children: [
+                  Text('Variables to pass',
+                      style: Theme.of(context).textTheme.labelLarge),
+                  const SizedBox(width: 6),
+                  IconButton(
+                    icon: const Icon(Icons.add_circle_outline, size: 18),
+                    tooltip: 'Add variable',
+                    onPressed: () {
+                      setState(() {
+                        _withVarsEntries.add(_WithVarEntry(
+                          keyCtrl: TextEditingController(),
+                          valCtrl: TextEditingController(),
+                        ));
+                      });
+                    },
+                  ),
+                ],
+              ),
+              if (_withVarsEntries.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Text(
+                    'No variables — the sub-test runs with its own defaults.',
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodySmall
+                        ?.copyWith(color: colorScheme.onSurfaceVariant),
+                  ),
+                ),
+              ...List.generate(_withVarsEntries.length, (i) {
+                final entry = _withVarsEntries[i];
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        flex: 2,
+                        child: TextFormField(
+                          controller: entry.keyCtrl,
+                          decoration: const InputDecoration(
+                            labelText: 'Key',
+                            border: OutlineInputBorder(),
+                            isDense: true,
+                          ),
+                          onChanged: (_) => _notify(),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        flex: 3,
+                        child: TextFormField(
+                          controller: entry.valCtrl,
+                          decoration: const InputDecoration(
+                            labelText: 'Value',
+                            border: OutlineInputBorder(),
+                            isDense: true,
+                          ),
+                          onChanged: (_) => _notify(),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close, size: 18),
+                        onPressed: () {
+                          setState(() {
+                            _withVarsEntries[i].keyCtrl.dispose();
+                            _withVarsEntries[i].valCtrl.dispose();
+                            _withVarsEntries.removeAt(i);
+                          });
+                          _notify();
+                        },
+                      ),
+                    ],
+                  ),
+                );
+              }),
+            ],
           ],
         ),
       ),
     );
   }
+}
+
+class _WithVarEntry {
+  final TextEditingController keyCtrl;
+  final TextEditingController valCtrl;
+  _WithVarEntry({required this.keyCtrl, required this.valCtrl});
 }

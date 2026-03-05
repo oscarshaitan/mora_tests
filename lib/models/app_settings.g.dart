@@ -16,7 +16,7 @@ _AppSettings _$AppSettingsFromJson(Map<String, dynamic> json) => _AppSettings(
       json['ovhFallbackModel'] as String? ?? AppConstants.mistralModel,
   vertexAiBaseUrl:
       json['vertexAiBaseUrl'] as String? ?? AppConstants.vertexAiBaseUrl,
-  vertexAiApiKey: json['vertexAiApiKey'] as String? ?? '',
+  vertexAiServiceAccountJson: json['vertexAiServiceAccountJson'] as String? ?? '',
   vertexAiPrimaryModel:
       json['vertexAiPrimaryModel'] as String? ?? AppConstants.geminiFlashModel,
   vertexAiFallbackModel:
@@ -35,7 +35,7 @@ Map<String, dynamic> _$AppSettingsToJson(_AppSettings instance) =>
       'ovhPrimaryModel': instance.ovhPrimaryModel,
       'ovhFallbackModel': instance.ovhFallbackModel,
       'vertexAiBaseUrl': instance.vertexAiBaseUrl,
-      'vertexAiApiKey': instance.vertexAiApiKey,
+      'vertexAiServiceAccountJson': instance.vertexAiServiceAccountJson,
       'vertexAiPrimaryModel': instance.vertexAiPrimaryModel,
       'vertexAiFallbackModel': instance.vertexAiFallbackModel,
       'browserHeadless': instance.browserHeadless,

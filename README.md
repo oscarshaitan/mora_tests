@@ -1,8 +1,12 @@
+<p align="center">
+  <img src="Mora Tests-modified.png" width="120" alt="Mora Tests logo"/>
+</p>
+
 # Mora Tests
 
 An AI-powered UI test runner built with Flutter Desktop (Windows + macOS).
 
-Tests are described in natural language YAML files. For each step the app takes a screenshot of an embedded WebView, sends it to **Qwen 2.5 VL 72B** (OVH AI Endpoints), and executes the LLM's returned action via **CDP (Chrome DevTools Protocol)** events and JavaScript injection.
+Tests are described in natural language YAML files. For each step the app takes a screenshot of an embedded WebView, sends it to a vision-capable LLM (**OVH AI Endpoints** or **Vertex AI**), and executes the LLM's returned action via **CDP (Chrome DevTools Protocol)** events and JavaScript injection.
 
 ---
 
@@ -128,13 +132,35 @@ flutter run -d macos
 
 ## Configuration
 
-On first launch, go to the **Settings** tab and enter:
+On first launch, go to the **Settings** tab to configure your LLM provider.
 
-| Field | Value |
-|-------|-------|
-| LLM Base URL | `https://oai.endpoints.kepler.ai.cloud.ovh.net/v1` |
+> For step-by-step instructions on obtaining credentials for each provider, see **[docs/providers.md](docs/providers.md)**.
+
+### Providers
+
+Two providers are supported. Each has its own URL, API key, primary model, and fallback model. Use the radio button on each card to select the active provider. Settings auto-save on every change.
+
+#### OVH AI Endpoints (default)
+
+| Field | Default value |
+|-------|---------------|
+| Base URL | `https://oai.endpoints.kepler.ai.cloud.ovh.net/v1` |
 | API Key | Your OVH AI Endpoints access token |
-| Model | `Qwen2.5-VL-72B-Instruct` |
+| Primary model | `Qwen2.5-VL-72B-Instruct` |
+| Fallback model | `Mistral-Small-3.2-24B-Instruct-2506` (optional) |
+
+#### Vertex AI
+
+| Field | Default value |
+|-------|---------------|
+| Base URL | `https://us-central1-aiplatform.googleapis.com/v1beta1/projects/YOUR_PROJECT_ID/locations/us-central1/endpoints/openapi` |
+| API Key | A valid Google OAuth 2.0 access token (`gcloud auth print-access-token`) |
+| Primary model | `google/gemini-2.5-flash` |
+| Fallback model | `google/gemini-3.1-flash-lite` (optional) |
+
+Replace `YOUR_PROJECT_ID` in the Vertex AI URL with your Google Cloud project ID.
+
+> **Fallback model:** if the primary model returns an error (e.g. rate-limit or quota), the runner automatically retries the same step with the fallback model before marking the step as failed.
 
 Settings are persisted in `shared_preferences` and survive app restarts.
 
@@ -195,9 +221,16 @@ steps:
     instruction: "Verify the dashboard loaded successfully"
     assert: "URL should contain /dashboard and a welcome banner should be visible"
     timeout: 30
+
+  # Call step — run another YAML file inline as a sub-test
+  - id: "step-006"
+    call: "shared/login.yaml"
+    with:
+      username: "admin@example.com"
+      password: "adminpass"
 ```
 
-### Fields
+### Top-level fields
 
 | Field | Required | Description |
 |-------|----------|-------------|
@@ -207,11 +240,18 @@ steps:
 | `seeder` | No | HTTP call made before the test runs |
 | `teardown` | No | HTTP call made after the test finishes (always, even on failure) |
 | `variables` | No | Key-value pairs; use `{{key}}` in instructions |
-| `steps[].instruction` | Yes | Natural language description of what to do |
-| `steps[].hint` | No | Extra guidance for the LLM (e.g. visual description, CSS selector hints) |
-| `steps[].assert` | No | Assertion the LLM should verify after acting |
-| `steps[].timeout` | No | Seconds to wait (default: 30) |
-| `steps[].max_sub_steps` | No | Enables **Explore mode** — LLM loops up to this many times to reach the goal |
+
+### Step fields
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `instruction` | Yes (unless `call` is set) | Natural language description of what to do |
+| `hint` | No | Extra guidance for the LLM (e.g. visual description, CSS selector hints) |
+| `assert` | No | Assertion the LLM should verify after acting |
+| `timeout` | No | Seconds to wait per LLM call (default: 30) |
+| `max_sub_steps` | No | Enables **Explore mode** — LLM loops up to this many times to reach the goal |
+| `call` | No | Path to another YAML file to run inline as a sub-test (relative to this file) |
+| `with` | No | Variable overrides passed into the sub-test (used with `call`) |
 
 ---
 
@@ -230,12 +270,50 @@ Use explore mode for multi-step flows where the exact number of actions is not k
 
 ---
 
+## Sub-test Calls
+
+The `call` field lets a step run another YAML file inline, avoiding duplicated steps across tests (e.g. a shared login sequence).
+
+```yaml
+# tests/checkout.yaml
+steps:
+  - call: shared/login.yaml
+    with:
+      username: "{{testUser}}"
+      password: "secret123"
+  - instruction: "Add the first product to the cart"
+```
+
+```yaml
+# tests/shared/login.yaml
+variables:
+  username: ""   # default — caller should override
+  password: ""
+
+steps:
+  - instruction: "Type {{username}} into the email field"
+  - instruction: "Type {{password}} into the password field"
+  - instruction: "Click Sign In"
+```
+
+**Variable merge order** (most specific wins):
+
+1. Caller's own variables
+2. Sub-test's `variables` block
+3. `with` overrides from the `call` step
+
+Sub-tests can themselves contain `call` steps — paths are always resolved relative to the file that declares them, so nesting works regardless of directory depth.
+
+The call step counts as a single step in the results view: it passes if all sub-steps pass, or fails with the first sub-step error message.
+
+---
+
 ## How It Works
 
 ```
 For each test step:
   1. Take WebView screenshot (PNG)
-  2. Send screenshot + instruction + hint → Qwen 2.5 VL 72B (OVH)
+  2. Send screenshot + instruction + hint → active LLM provider (OVH or Vertex AI)
   3. LLM returns JSON: { "action": "click", "x": 378, "y": 400, ... }
   4. Execute action:
        - click / doubleClick / longPress → JS PointerEvent sequence (synchronous,
@@ -244,8 +322,10 @@ For each test step:
        - pressKey → CDP Input.dispatchKeyEvent
        - scroll → CDP mouseWheel + JS window.scrollBy (belt-and-suspenders)
        - assert_* → JavaScript (returns true/false)
+       - call  → load sub-test YAML, merge variables, run steps inline
   5. Wait for page to settle, take "after" screenshot
   6. On failure: retry up to 2× with error context fed back to the LLM
+     If primary model fails, retry once with the fallback model
 ```
 
 **Supported actions:** `click`, `doubleClick`, `longPress`, `type`, `scroll`, `navigate`, `wait`, `hover`, `pressKey`, `selectOption`, `assert_text`, `assert_url`, `assert_visible`, `done`, `fail`
@@ -263,30 +343,47 @@ This guarantees every test starts from a logged-out baseline regardless of what 
 
 ---
 
+## Branding & Icons
+
+The app icon (`assets/app_icon.png`) is used as the source for all platform icons (Windows `.ico`, macOS `.icns` sizes). Icons are generated with [`flutter_launcher_icons`](https://pub.dev/packages/flutter_launcher_icons).
+
+To regenerate icons after changing the source image:
+
+```bash
+dart run flutter_launcher_icons
+```
+
+The theme palette is derived from the logo's neon-pink-on-deep-purple colour scheme using Material 3 `ColorScheme.fromSeed`.
+
+---
+
 ## Project Structure
 
 ```
+assets/
+└── app_icon.png                # source image used to generate all platform icons
+
 lib/
 ├── main.dart
-├── injection.dart              # get_it service registration
+├── injection.dart              # get_it service registration + provider switching
 ├── core/
-│   ├── constants.dart
+│   ├── constants.dart          # LlmProvider enum, default URLs and model names
 │   └── exceptions.dart
 ├── models/                     # freezed data models
 │   ├── test_case.dart
-│   ├── test_step.dart
+│   ├── test_step.dart          # supports call + withVars for sub-test steps
 │   ├── http_hook.dart
 │   ├── llm_action.dart
 │   ├── step_result.dart
 │   ├── test_run.dart
-│   └── app_settings.dart
+│   └── app_settings.dart       # per-provider URL, API key, and model config
 ├── services/
 │   ├── webview_service.dart    # CDP + JS action execution, screenshot, session cleanup
 │   ├── js_builder.dart         # generates JS for assert_* actions
-│   ├── llm_service.dart        # OVH Qwen vision API
+│   ├── llm_service.dart        # OpenAI-compatible vision API (OVH and Vertex AI)
 │   ├── http_hook_service.dart  # seeder / teardown HTTP calls
-│   ├── test_runner.dart        # orchestration loop (standard + explore mode)
-│   └── storage_service.dart    # YAML load/save
+│   ├── test_runner.dart        # orchestration (standard, explore, and call-step modes)
+│   └── storage_service.dart    # YAML load/save, run persistence
 ├── cubits/
 │   ├── builder/
 │   ├── runner/
@@ -296,12 +393,12 @@ lib/
 │   ├── builder/
 │   │   ├── builder_screen.dart
 │   │   ├── test_form.dart
-│   │   └── step_list_editor.dart
+│   │   └── step_list_editor.dart  # Normal / Explore / Call sub-test step modes
 │   ├── runner/
 │   │   ├── runner_screen.dart
 │   │   ├── run_view.dart
 │   │   └── results_view.dart
-│   └── settings_screen.dart
+│   └── settings_screen.dart        # provider cards with per-provider config dialogs
 └── widgets/
     ├── step_card.dart
     ├── screenshot_panel.dart

@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:developer' as dev;
+import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:path/path.dart' as p;
 import 'package:uuid/uuid.dart';
 
 import '../core/constants.dart';
@@ -12,21 +14,25 @@ import '../models/test_run.dart';
 import '../models/test_step.dart';
 import 'http_hook_service.dart';
 import 'llm_service.dart';
+import 'storage_service.dart';
 import 'webview_service.dart';
 
 class TestRunner {
   final WebViewService webViewService;
   final LlmService llmService;
   final HttpHookService httpHookService;
+  final StorageService storageService;
 
   static const _uuid = Uuid();
 
   bool _aborted = false;
+  String _callerDir = '';
 
   TestRunner({
     required this.webViewService,
     required this.llmService,
     required this.httpHookService,
+    required this.storageService,
   });
 
   void abort() => _aborted = true;
@@ -39,6 +45,9 @@ class TestRunner {
     bool stopOnFirstFailure = true,
   }) async {
     _aborted = false;
+    _callerDir = (testCase.filePath?.isNotEmpty == true)
+        ? p.dirname(testCase.filePath!)
+        : Directory.current.path;
 
     final run = TestRun(
       id: _uuid.v4(),
@@ -137,6 +146,16 @@ class TestRunner {
     required int stepNumber,
     required int totalSteps,
   }) async {
+    // Call steps run a referenced YAML file inline.
+    if (step.call != null) {
+      return _runCallStep(
+        step: step,
+        variables: variables,
+        stepNumber: stepNumber,
+        totalSteps: totalSteps,
+      );
+    }
+
     // Explore steps have their own multi-turn loop.
     if (step.maxSubSteps != null) {
       return _runExploreStep(
@@ -258,6 +277,99 @@ class TestRunner {
 
     // Unreachable
     throw StateError('Unreachable');
+  }
+
+  /// Runs a call step by loading and executing a referenced YAML sub-test inline.
+  ///
+  /// The sub-test's variables are merged with [step.withVars] (withVars win on
+  /// conflict) and also with the caller's [variables] so that any outer
+  /// variables are still accessible inside the sub-test.
+  Future<StepResult> _runCallStep({
+    required TestStep step,
+    required Map<String, String> variables,
+    required int stepNumber,
+    required int totalSteps,
+  }) async {
+    final stopwatch = Stopwatch()..start();
+    final callPath = p.isAbsolute(step.call!)
+        ? step.call!
+        : p.join(_callerDir, step.call!);
+
+    dev.log('─' * 56, name: 'MoraTests');
+    dev.log('Step $stepNumber/$totalSteps [Call]: ${step.call}', name: 'MoraTests');
+
+    final screenshotBefore = await _safeScreenshot() ?? _emptyPng();
+
+    TestCase subTest;
+    try {
+      subTest = await storageService.loadTestCase(callPath);
+    } catch (e) {
+      return StepResult(
+        stepId: step.id,
+        success: false,
+        screenshotBefore: screenshotBefore,
+        errorMessage: 'Call step failed to load "$callPath": $e',
+        duration: stopwatch.elapsed,
+        executedAt: DateTime.now(),
+      );
+    }
+
+    // Merge variables: caller vars < sub-test vars < withVars (most specific wins)
+    final mergedVars = {
+      ...variables,
+      ...subTest.variables,
+      ..._interpolateMap(step.withVars, variables),
+    };
+
+    // Save and update caller dir so nested call steps resolve correctly
+    final savedCallerDir = _callerDir;
+    _callerDir = (subTest.filePath?.isNotEmpty == true)
+        ? p.dirname(subTest.filePath!)
+        : _callerDir;
+
+    final subStepCount = subTest.steps.length;
+    dev.log('  Sub-test "${subTest.name}" ($subStepCount step${subStepCount == 1 ? '' : 's'})',
+        name: 'MoraTests');
+
+    String? firstFailure;
+    for (int i = 0; i < subTest.steps.length; i++) {
+      if (_aborted) break;
+      final subStep = subTest.steps[i];
+      final result = await _runStep(
+        step: subStep,
+        variables: mergedVars,
+        stepNumber: i + 1,
+        totalSteps: subStepCount,
+      );
+      if (!result.success) {
+        firstFailure = result.errorMessage ?? 'sub-step ${i + 1} failed';
+        break;
+      }
+    }
+
+    _callerDir = savedCallerDir;
+
+    final screenshotAfter = await _safeScreenshot();
+    return StepResult(
+      stepId: step.id,
+      success: firstFailure == null,
+      screenshotBefore: screenshotBefore,
+      screenshotAfter: screenshotAfter,
+      errorMessage: firstFailure,
+      rawLlmResponse: firstFailure == null
+          ? 'Sub-test "${subTest.name}" completed successfully'
+          : null,
+      duration: stopwatch.elapsed,
+      executedAt: DateTime.now(),
+    );
+  }
+
+  /// Interpolates all values in [map] using [variables].
+  Map<String, String> _interpolateMap(
+      Map<String, String> map, Map<String, String> variables) {
+    return {
+      for (final e in map.entries) e.key: _interpolate(e.value, variables),
+    };
   }
 
   /// Runs a step in explore / multi-turn mode.

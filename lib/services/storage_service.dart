@@ -98,6 +98,8 @@ class StorageService {
       assertion: yaml['assert']?.toString(),
       timeoutSeconds: (yaml['timeout'] as int?) ?? 30,
       maxSubSteps: yaml['max_sub_steps'] as int?,
+      call: yaml['call']?.toString(),
+      withVars: _parseStringMap(yaml['with']),
     );
   }
 
@@ -143,7 +145,9 @@ class StorageService {
   Map<String, dynamic> _stepToMap(TestStep step) {
     return {
       'id': step.id,
-      'instruction': step.instruction,
+      if (step.call != null) 'call': step.call,
+      if (step.withVars.isNotEmpty) 'with': step.withVars,
+      if (step.instruction.isNotEmpty) 'instruction': step.instruction,
       if (step.hint != null && step.hint!.isNotEmpty) 'hint': step.hint,
       if (step.assertion != null && step.assertion!.isNotEmpty)
         'assert': step.assertion,

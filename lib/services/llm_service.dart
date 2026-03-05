@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:developer' as dev;
 import 'dart:typed_data';
 
+import 'package:googleapis_auth/auth_io.dart' as gauth;
 import 'package:http/http.dart' as http;
 
 import '../core/constants.dart';
@@ -67,19 +68,42 @@ JSON SCHEMA (respond with EXACTLY this shape):
 class LlmService {
   final String baseUrl;
   final String apiKey;
+  final String? serviceAccountJson;
   final String model;
   final String? fallbackModel;
   final double temperature;
   final int maxTokens;
 
+  gauth.AutoRefreshingAuthClient? _authClient;
+
   LlmService({
     required this.baseUrl,
-    required this.apiKey,
+    this.apiKey = '',
+    this.serviceAccountJson,
     required this.model,
     this.fallbackModel,
     this.temperature = 0.1,
     this.maxTokens = 512,
   });
+
+  bool get _usesServiceAccount =>
+      serviceAccountJson != null && serviceAccountJson!.isNotEmpty;
+
+  Future<gauth.AutoRefreshingAuthClient> _getAuthClient() async {
+    if (_authClient != null) return _authClient!;
+    try {
+      final credentials = gauth.ServiceAccountCredentials.fromJson(
+        jsonDecode(serviceAccountJson!) as Map<String, dynamic>,
+      );
+      _authClient = await gauth.clientViaServiceAccount(
+        credentials,
+        ['https://www.googleapis.com/auth/cloud-platform'],
+      );
+      return _authClient!;
+    } catch (e) {
+      throw LlmException('Invalid service account JSON: $e');
+    }
+  }
 
   Future<LlmAction> interpretStep({
     required String instruction,
@@ -187,44 +211,39 @@ class LlmService {
 
   /// Makes the HTTP request to the LLM API.
   ///
-  /// Handles HTTP 429 (rate limit) transparently: waits for the duration
-  /// specified in the `Retry-After` response header (or
-  /// [AppConstants.rateLimitDelaySeconds] if the header is absent) then
-  /// retries the request once. Any other non-200 status throws [LlmException].
+  /// For Vertex AI, uses a service account `AutoRefreshingAuthClient` which
+  /// handles token acquisition and refresh automatically. On 401 the client
+  /// is recreated once to force a fresh token exchange.
+  ///
+  /// For OVH (static key), handles HTTP 429 transparently: waits for the
+  /// duration in the `Retry-After` header (or
+  /// [AppConstants.rateLimitDelaySeconds]) then retries once.
   Future<http.Response> _doRequest(Map<String, dynamic> body) async {
-    final headers = {
-      'Authorization': 'Bearer $apiKey',
-      'Content-Type': 'application/json',
-    };
     final uri = Uri.parse('$baseUrl/chat/completions');
     final encoded = jsonEncode(body);
+    final modelName = body['model'] as String;
 
-    http.Response response;
-    try {
-      response = await http
-          .post(uri, headers: headers, body: encoded)
-          .timeout(const Duration(seconds: 90));
-    } on TimeoutException {
-      throw LlmException('Request timed out after 90 s (model: ${body['model']})');
+    var response = await _sendOnce(uri, encoded, modelName);
+
+    // Service account: on 401 force token refresh and retry once.
+    if (response.statusCode == 401 && _usesServiceAccount) {
+      dev.log('Token expired (401) — refreshing service account credentials',
+          name: 'LlmService');
+      _authClient?.close();
+      _authClient = null;
+      response = await _sendOnce(uri, encoded, modelName);
     }
 
-    if (response.statusCode == 429) {
+    // Static key: on 429 wait and retry once.
+    if (response.statusCode == 429 && !_usesServiceAccount) {
       final retryAfter = int.tryParse(
-            response.headers['retry-after'] ?? '',
-          ) ??
-          AppConstants.rateLimitDelaySeconds;
-      dev.log(
-        'Rate limited (429) — waiting ${retryAfter}s before retry',
-        name: 'LlmService',
-      );
+                response.headers['retry-after'] ?? '',
+              ) ??
+              AppConstants.rateLimitDelaySeconds;
+      dev.log('Rate limited (429) — waiting ${retryAfter}s before retry',
+          name: 'LlmService');
       await Future.delayed(Duration(seconds: retryAfter));
-      try {
-        response = await http
-            .post(uri, headers: headers, body: encoded)
-            .timeout(const Duration(seconds: 90));
-      } on TimeoutException {
-        throw LlmException('Request timed out after 90 s on 429-retry (model: ${body['model']})');
-      }
+      response = await _sendOnce(uri, encoded, modelName);
     }
 
     if (response.statusCode != 200) {
@@ -233,6 +252,31 @@ class LlmService {
       );
     }
     return response;
+  }
+
+  Future<http.Response> _sendOnce(
+      Uri uri, String encoded, String modelName) async {
+    try {
+      if (_usesServiceAccount) {
+        final client = await _getAuthClient();
+        return await client
+            .post(uri,
+                headers: {'Content-Type': 'application/json'}, body: encoded)
+            .timeout(const Duration(seconds: 90));
+      } else {
+        return await http
+            .post(uri,
+                headers: {
+                  'Authorization': 'Bearer $apiKey',
+                  'Content-Type': 'application/json',
+                },
+                body: encoded)
+            .timeout(const Duration(seconds: 90));
+      }
+    } on TimeoutException {
+      throw LlmException(
+          'Request timed out after 90 s (model: $modelName)');
+    }
   }
 
   /// Extracts a clean JSON object string from raw LLM output.

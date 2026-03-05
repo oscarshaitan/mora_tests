@@ -52,7 +52,8 @@ LlmService _buildLlmService(AppSettings s) {
   final isVertex = s.activeProvider == 'vertexAi';
   return LlmService(
     baseUrl: isVertex ? s.vertexAiBaseUrl : s.ovhBaseUrl,
-    apiKey: isVertex ? s.vertexAiApiKey : s.ovhApiKey,
+    apiKey: isVertex ? '' : s.ovhApiKey,
+    serviceAccountJson: isVertex ? s.vertexAiServiceAccountJson : null,
     model: isVertex ? s.vertexAiPrimaryModel : s.ovhPrimaryModel,
     fallbackModel: isVertex ? s.vertexAiFallbackModel : s.ovhFallbackModel,
   );

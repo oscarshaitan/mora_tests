@@ -8,11 +8,15 @@ part of 'test_step.dart';
 
 _TestStep _$TestStepFromJson(Map<String, dynamic> json) => _TestStep(
   id: json['id'] as String,
-  instruction: json['instruction'] as String,
+  instruction: json['instruction'] as String? ?? '',
   hint: json['hint'] as String?,
   assertion: json['assertion'] as String?,
   timeoutSeconds: (json['timeoutSeconds'] as num?)?.toInt() ?? 30,
   maxSubSteps: (json['maxSubSteps'] as num?)?.toInt() ?? null,
+  call: json['call'] as String?,
+  withVars: (json['withVars'] as Map<String, dynamic>?)
+          ?.map((k, v) => MapEntry(k, v as String)) ??
+      const {},
 );
 
 Map<String, dynamic> _$TestStepToJson(_TestStep instance) => <String, dynamic>{
@@ -22,4 +26,6 @@ Map<String, dynamic> _$TestStepToJson(_TestStep instance) => <String, dynamic>{
   'assertion': instance.assertion,
   'timeoutSeconds': instance.timeoutSeconds,
   'maxSubSteps': instance.maxSubSteps,
+  'call': instance.call,
+  'withVars': instance.withVars,
 };
