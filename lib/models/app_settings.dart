@@ -8,10 +8,21 @@ part 'app_settings.g.dart';
 @freezed
 abstract class AppSettings with _$AppSettings {
   const factory AppSettings({
-    @Default(AppConstants.defaultLlmBaseUrl) String llmBaseUrl,
-    @Default('') String llmApiKey,
-    @Default(AppConstants.defaultLlmModel) String llmModel,
-    @Default(AppConstants.mistralModel) String llmFallbackModel,
+    // Which provider the test runner uses
+    @Default('ovh') String activeProvider,
+
+    // OVH AI
+    @Default(AppConstants.defaultLlmBaseUrl) String ovhBaseUrl,
+    @Default('') String ovhApiKey,
+    @Default(AppConstants.defaultLlmModel) String ovhPrimaryModel,
+    @Default(AppConstants.mistralModel) String ovhFallbackModel,
+
+    // Vertex AI
+    @Default(AppConstants.vertexAiBaseUrl) String vertexAiBaseUrl,
+    @Default('') String vertexAiApiKey,
+    @Default(AppConstants.geminiFlashModel) String vertexAiPrimaryModel,
+    @Default(AppConstants.geminiFlashLiteModel) String vertexAiFallbackModel,
+
     @Default(false) bool browserHeadless,
     @Default(0.5) double confidenceThreshold,
   }) = _AppSettings;

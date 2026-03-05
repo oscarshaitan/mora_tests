@@ -42,27 +42,24 @@ Future<void> setupInjection() async {
   sl.registerLazySingleton<JsBuilder>(() => JsBuilder());
 
   // LlmService reads from AppSettings singleton
-  sl.registerLazySingleton<LlmService>(() {
-    final s = sl<AppSettings>();
-    return LlmService(
-      baseUrl: s.llmBaseUrl,
-      apiKey: s.llmApiKey,
-      model: s.llmModel,
-      fallbackModel: s.llmFallbackModel,
-    );
-  });
+  sl.registerLazySingleton<LlmService>(() => _buildLlmService(sl<AppSettings>()));
 
   // WebViewService: factory (each Runner screen gets its own instance)
   sl.registerFactory<WebViewService>(() => WebViewService(sl<JsBuilder>()));
 }
 
+LlmService _buildLlmService(AppSettings s) {
+  final isVertex = s.activeProvider == 'vertexAi';
+  return LlmService(
+    baseUrl: isVertex ? s.vertexAiBaseUrl : s.ovhBaseUrl,
+    apiKey: isVertex ? s.vertexAiApiKey : s.ovhApiKey,
+    model: isVertex ? s.vertexAiPrimaryModel : s.ovhPrimaryModel,
+    fallbackModel: isVertex ? s.vertexAiFallbackModel : s.ovhFallbackModel,
+  );
+}
+
 /// Re-registers [LlmService] after settings change (call from SettingsCubit).
 void refreshLlmService(AppSettings settings) {
   if (sl.isRegistered<LlmService>()) sl.unregister<LlmService>();
-  sl.registerLazySingleton<LlmService>(() => LlmService(
-        baseUrl: settings.llmBaseUrl,
-        apiKey: settings.llmApiKey,
-        model: settings.llmModel,
-        fallbackModel: settings.llmFallbackModel,
-      ));
+  sl.registerLazySingleton<LlmService>(() => _buildLlmService(settings));
 }

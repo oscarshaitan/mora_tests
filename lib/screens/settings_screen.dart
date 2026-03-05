@@ -5,6 +5,28 @@ import '../core/constants.dart';
 import '../cubits/settings/settings_cubit.dart';
 import '../cubits/settings/settings_state.dart';
 
+// ---------------------------------------------------------------------------
+// Simple data holder for one provider's config (used as local UI state)
+// ---------------------------------------------------------------------------
+
+class _ProviderConfig {
+  String baseUrl;
+  String apiKey;
+  String primaryModel;
+  String fallbackModel;
+
+  _ProviderConfig({
+    required this.baseUrl,
+    required this.apiKey,
+    required this.primaryModel,
+    required this.fallbackModel,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Settings screen
+// ---------------------------------------------------------------------------
+
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
 
@@ -13,53 +35,74 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  late TextEditingController _baseUrlCtrl;
-  late TextEditingController _apiKeyCtrl;
-  late TextEditingController _modelCtrl;
-  late TextEditingController _fallbackModelCtrl;
-
-  static const _presets = [
-    AppConstants.defaultLlmModel,
-    AppConstants.mistralModel,
-  ];
+  late LlmProvider _activeProvider;
+  late _ProviderConfig _ovhConfig;
+  late _ProviderConfig _vertexConfig;
 
   @override
   void initState() {
     super.initState();
     final s = context.read<SettingsCubit>().state.settings;
-    _baseUrlCtrl = TextEditingController(text: s.llmBaseUrl);
-    _apiKeyCtrl = TextEditingController(text: s.llmApiKey);
-    _modelCtrl = TextEditingController(text: s.llmModel);
-    _fallbackModelCtrl = TextEditingController(text: s.llmFallbackModel);
+    _activeProvider =
+        s.activeProvider == 'vertexAi' ? LlmProvider.vertexAi : LlmProvider.ovh;
+    _ovhConfig = _ProviderConfig(
+      baseUrl: s.ovhBaseUrl,
+      apiKey: s.ovhApiKey,
+      primaryModel: s.ovhPrimaryModel,
+      fallbackModel: s.ovhFallbackModel,
+    );
+    _vertexConfig = _ProviderConfig(
+      baseUrl: s.vertexAiBaseUrl,
+      apiKey: s.vertexAiApiKey,
+      primaryModel: s.vertexAiPrimaryModel,
+      fallbackModel: s.vertexAiFallbackModel,
+    );
   }
 
-  @override
-  void dispose() {
-    _baseUrlCtrl.dispose();
-    _apiKeyCtrl.dispose();
-    _modelCtrl.dispose();
-    _fallbackModelCtrl.dispose();
-    super.dispose();
-  }
+  Future<void> _openSettings(LlmProvider provider) async {
+    final isVertex = provider == LlmProvider.vertexAi;
+    final config = isVertex ? _vertexConfig : _ovhConfig;
 
-  /// Selects [model] as primary and auto-sets the fallback to the other preset
-  /// (if the current primary is a known preset).
-  void _selectPrimary(String model) {
-    setState(() {
-      _modelCtrl.text = model;
-      // Auto-set fallback to the other preset
-      final other = _presets.firstWhere((p) => p != model, orElse: () => '');
-      if (other.isNotEmpty) _fallbackModelCtrl.text = other;
-    });
+    final result = await showDialog<_ProviderConfig>(
+      context: context,
+      builder: (_) => _ProviderSettingsDialog(
+        title: isVertex ? 'Vertex AI' : 'OVH AI',
+        config: config,
+        primaryModelHint: isVertex
+            ? AppConstants.geminiFlashModel
+            : AppConstants.defaultLlmModel,
+        fallbackModelHint: isVertex
+            ? AppConstants.geminiFlashLiteModel
+            : AppConstants.mistralModel,
+        apiKeyLabel: isVertex ? 'Access Token (Google OAuth2)' : 'API Key',
+        vertexHint: isVertex,
+      ),
+    );
+
+    if (result != null) {
+      setState(() {
+        if (isVertex) {
+          _vertexConfig = result;
+        } else {
+          _ovhConfig = result;
+        }
+      });
+    }
   }
 
   void _save(BuildContext context) {
     final cubit = context.read<SettingsCubit>();
     cubit.update(cubit.state.settings.copyWith(
-      llmBaseUrl: _baseUrlCtrl.text.trim(),
-      llmApiKey: _apiKeyCtrl.text.trim(),
-      llmModel: _modelCtrl.text.trim(),
-      llmFallbackModel: _fallbackModelCtrl.text.trim(),
+      activeProvider:
+          _activeProvider == LlmProvider.vertexAi ? 'vertexAi' : 'ovh',
+      ovhBaseUrl: _ovhConfig.baseUrl,
+      ovhApiKey: _ovhConfig.apiKey,
+      ovhPrimaryModel: _ovhConfig.primaryModel,
+      ovhFallbackModel: _ovhConfig.fallbackModel,
+      vertexAiBaseUrl: _vertexConfig.baseUrl,
+      vertexAiApiKey: _vertexConfig.apiKey,
+      vertexAiPrimaryModel: _vertexConfig.primaryModel,
+      vertexAiFallbackModel: _vertexConfig.fallbackModel,
     ));
     cubit.save();
   }
@@ -67,13 +110,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     return BlocConsumer<SettingsCubit, SettingsState>(
-      listener: (context, state) {
-        if (state.savedMessage != null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(state.savedMessage!)),
-          );
-        }
-      },
+      listener: (_, _) {},
       builder: (context, state) {
         final cubit = context.read<SettingsCubit>();
         return Padding(
@@ -88,79 +125,39 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       style: Theme.of(context).textTheme.headlineSmall),
                   const SizedBox(height: 24),
 
-                  // ── LLM Configuration ─────────────────────────────────────
-                  Text('LLM Configuration',
+                  // ── LLM Providers ──────────────────────────────────────────
+                  Text('LLM Providers',
                       style: Theme.of(context).textTheme.titleMedium),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: _baseUrlCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Base URL',
-                      border: OutlineInputBorder(),
-                      hintText:
-                          'https://oai.endpoints.kepler.ai.cloud.ovh.net/v1',
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: _apiKeyCtrl,
-                    obscureText: true,
-                    decoration: const InputDecoration(
-                      labelText: 'API Key / Access Token',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-
-                  // ── Model Selection ────────────────────────────────────────
-                  Text('Model Selection',
-                      style: Theme.of(context).textTheme.titleSmall),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 6),
                   Text(
-                    'Choose your primary model. The other preset is used as automatic fallback when the primary fails.',
+                    'Toggle a provider to make it the active service. '
+                    'Tap the settings icon to configure its URL, key, and models.',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: _presets.map((preset) {
-                      final isPrimary = _modelCtrl.text == preset;
-                      final isFallback = _fallbackModelCtrl.text == preset;
-                      return Expanded(
-                        child: Padding(
-                          padding: EdgeInsets.only(
-                            right: preset == _presets.last ? 0 : 8,
-                          ),
-                          child: _ModelCard(
-                            modelId: preset,
-                            isPrimary: isPrimary,
-                            isFallback: isFallback && !isPrimary,
-                            onSetPrimary: () => _selectPrimary(preset),
-                          ),
-                        ),
-                      );
-                    }).toList(),
+                  const SizedBox(height: 16),
+
+                  _ProviderCard(
+                    title: 'OVH AI',
+                    config: _ovhConfig,
+                    isActive: _activeProvider == LlmProvider.ovh,
+                    onActivate: () {
+                      setState(() => _activeProvider = LlmProvider.ovh);
+                      _save(context);
+                    },
+                    onConfigure: () => _openSettings(LlmProvider.ovh),
                   ),
                   const SizedBox(height: 12),
-                  TextFormField(
-                    controller: _modelCtrl,
-                    onChanged: (_) => setState(() {}),
-                    decoration: const InputDecoration(
-                      labelText: 'Primary model (custom override)',
-                      border: OutlineInputBorder(),
-                      hintText: 'Qwen2.5-VL-72B-Instruct',
-                    ),
+                  _ProviderCard(
+                    title: 'Vertex AI',
+                    config: _vertexConfig,
+                    isActive: _activeProvider == LlmProvider.vertexAi,
+                    onActivate: () {
+                      setState(() => _activeProvider = LlmProvider.vertexAi);
+                      _save(context);
+                    },
+                    onConfigure: () => _openSettings(LlmProvider.vertexAi),
                   ),
-                  const SizedBox(height: 8),
-                  TextFormField(
-                    controller: _fallbackModelCtrl,
-                    onChanged: (_) => setState(() {}),
-                    decoration: const InputDecoration(
-                      labelText: 'Fallback model (custom override)',
-                      border: OutlineInputBorder(),
-                      hintText: 'Mistral-Small-3.2-24B-Instruct-2506',
-                    ),
-                  ),
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 32),
 
                   // ── Behaviour ──────────────────────────────────────────────
                   Text('Behaviour',
@@ -171,7 +168,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
                       side: BorderSide(
-                          color: Theme.of(context).colorScheme.outlineVariant),
+                          color:
+                              Theme.of(context).colorScheme.outlineVariant),
                     ),
                     child: SwitchListTile(
                       title: const Text('Headless WebView'),
@@ -179,25 +177,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           'Run WebView without a visible window'
                           ' (not supported on all platforms)'),
                       value: state.settings.browserHeadless,
-                      onChanged: (v) => cubit.update(
-                        state.settings.copyWith(browserHeadless: v),
-                      ),
+                      onChanged: (v) {
+                        cubit.update(state.settings.copyWith(browserHeadless: v));
+                        cubit.save();
+                      },
                     ),
                   ),
-                  const SizedBox(height: 28),
-
-                  FilledButton.icon(
-                    onPressed: state.isSaving ? null : () => _save(context),
-                    icon: state.isSaving
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.save_rounded),
-                    label: const Text('Save Settings'),
-                  ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 16),
                 ],
               ),
             ),
@@ -208,103 +194,224 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 }
 
-class _ModelCard extends StatelessWidget {
-  final String modelId;
-  final bool isPrimary;
-  final bool isFallback;
-  final VoidCallback onSetPrimary;
+// ---------------------------------------------------------------------------
+// Provider card widget
+// ---------------------------------------------------------------------------
 
-  const _ModelCard({
-    required this.modelId,
-    required this.isPrimary,
-    required this.isFallback,
-    required this.onSetPrimary,
+class _ProviderCard extends StatelessWidget {
+  final String title;
+  final _ProviderConfig config;
+  final bool isActive;
+  final VoidCallback onActivate;
+  final VoidCallback onConfigure;
+
+  const _ProviderCard({
+    required this.title,
+    required this.config,
+    required this.isActive,
+    required this.onActivate,
+    required this.onConfigure,
   });
+
+  String _short(String model) => model.replaceFirst('google/', '');
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final borderColor = isPrimary
-        ? colorScheme.primary
-        : isFallback
-            ? colorScheme.outline
-            : colorScheme.outlineVariant;
-
-    return InkWell(
-      onTap: isPrimary ? null : onSetPrimary,
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: borderColor, width: isPrimary ? 2 : 1),
-          color: isPrimary
-              ? colorScheme.primaryContainer.withValues(alpha: 0.3)
-              : null,
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: isActive ? colorScheme.primary : colorScheme.outlineVariant,
+          width: isActive ? 2 : 1,
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+      ),
+      color: isActive
+          ? colorScheme.primaryContainer.withValues(alpha: 0.15)
+          : null,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
+        child: Row(
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    modelId,
-                    style: const TextStyle(fontSize: 11),
-                    overflow: TextOverflow.ellipsis,
-                    maxLines: 2,
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title,
+                      style: Theme.of(context).textTheme.titleSmall),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Primary: ${_short(config.primaryModel)}',
+                    style: Theme.of(context).textTheme.bodySmall,
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            if (isPrimary)
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: colorScheme.primary,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(
-                  'PRIMARY',
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: colorScheme.onPrimary,
-                    fontWeight: FontWeight.bold,
+                  Text(
+                    'Fallback: ${_short(config.fallbackModel)}',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
                   ),
-                ),
-              )
-            else if (isFallback)
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: colorScheme.surfaceContainerHigh,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(
-                  'FALLBACK',
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              )
-            else
-              TextButton(
-                onPressed: onSetPrimary,
-                style: TextButton.styleFrom(
-                  padding: EdgeInsets.zero,
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                child: const Text('Set as primary',
-                    style: TextStyle(fontSize: 10)),
+                ],
               ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.settings_outlined),
+              tooltip: 'Configure',
+              onPressed: onConfigure,
+            ),
+            GestureDetector(
+              onTap: isActive ? null : onActivate,
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Icon(
+                  isActive
+                      ? Icons.radio_button_checked
+                      : Icons.radio_button_unchecked,
+                  color: isActive
+                      ? colorScheme.primary
+                      : colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 }
+
+// ---------------------------------------------------------------------------
+// Provider settings dialog
+// ---------------------------------------------------------------------------
+
+class _ProviderSettingsDialog extends StatefulWidget {
+  final String title;
+  final _ProviderConfig config;
+  final String primaryModelHint;
+  final String fallbackModelHint;
+  final String apiKeyLabel;
+  final bool vertexHint;
+
+  const _ProviderSettingsDialog({
+    required this.title,
+    required this.config,
+    required this.primaryModelHint,
+    required this.fallbackModelHint,
+    required this.apiKeyLabel,
+    this.vertexHint = false,
+  });
+
+  @override
+  State<_ProviderSettingsDialog> createState() =>
+      _ProviderSettingsDialogState();
+}
+
+class _ProviderSettingsDialogState extends State<_ProviderSettingsDialog> {
+  late TextEditingController _baseUrlCtrl;
+  late TextEditingController _apiKeyCtrl;
+  late TextEditingController _primaryModelCtrl;
+  late TextEditingController _fallbackModelCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _baseUrlCtrl = TextEditingController(text: widget.config.baseUrl);
+    _apiKeyCtrl = TextEditingController(text: widget.config.apiKey);
+    _primaryModelCtrl =
+        TextEditingController(text: widget.config.primaryModel);
+    _fallbackModelCtrl =
+        TextEditingController(text: widget.config.fallbackModel);
+  }
+
+  @override
+  void dispose() {
+    _baseUrlCtrl.dispose();
+    _apiKeyCtrl.dispose();
+    _primaryModelCtrl.dispose();
+    _fallbackModelCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text('${widget.title} — Configuration'),
+      content: SingleChildScrollView(
+        child: SizedBox(
+          width: 480,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (widget.vertexHint)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Text(
+                    'Replace YOUR_PROJECT_ID in the URL with your Google Cloud project ID.',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
+              TextFormField(
+                controller: _baseUrlCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Base URL',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _apiKeyCtrl,
+                obscureText: true,
+                decoration: InputDecoration(
+                  labelText: widget.apiKeyLabel,
+                  border: const OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text('Models', style: Theme.of(context).textTheme.titleSmall),
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: _primaryModelCtrl,
+                decoration: InputDecoration(
+                  labelText: 'Primary model',
+                  border: const OutlineInputBorder(),
+                  hintText: widget.primaryModelHint,
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: _fallbackModelCtrl,
+                decoration: InputDecoration(
+                  labelText: 'Fallback model (optional)',
+                  border: const OutlineInputBorder(),
+                  hintText: widget.fallbackModelHint,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(
+            _ProviderConfig(
+              baseUrl: _baseUrlCtrl.text.trim(),
+              apiKey: _apiKeyCtrl.text.trim(),
+              primaryModel: _primaryModelCtrl.text.trim(),
+              fallbackModel: _fallbackModelCtrl.text.trim(),
+            ),
+          ),
+          child: const Text('Apply'),
+        ),
+      ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Model card (reused inside the dialog)
+// ---------------------------------------------------------------------------
