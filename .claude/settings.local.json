@@ -4,7 +4,12 @@
       "Bash(flutter pub get)",
       "Bash(dart run flutter_launcher_icons)",
       "Bash(dart run build_runner build --delete-conflicting-outputs)",
-      "Bash(flutter test)"
+      "Bash(flutter test)",
+      "Bash(flutter test --coverage)",
+      "Bash(dart pub global run lcov_dart:filter_coverage)",
+      "Bash(node -e \":*)",
+      "Bash(node coverage/parse_cov.js)",
+      "Bash(flutter test test/http_hook_service_test.dart test/llm_service_test.dart test/settings_cubit_test.dart test/webview_service_test.dart --coverage)"
     ]
   }
 }
