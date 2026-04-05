@@ -39,6 +39,9 @@ class TestRunner {
 
   /// Runs a [TestCase] and emits [StepResult]s via [onStepResult].
   /// Returns the completed [TestRun].
+  ///
+  /// [onStepActionUpdated] is called when the LLM fallback resolves a new
+  /// action for a pre-computed step, so the caller can persist the update.
   Future<TestRun> run({
     required TestCase testCase,
     required void Function(StepResult) onStepResult,
@@ -48,6 +51,7 @@ class TestRunner {
       int totalSubSteps,
       StepResult? completedSubStep,
     )? onSubTestProgress,
+    void Function(String stepId, LlmAction newAction)? onStepActionUpdated,
     bool stopOnFirstFailure = true,
   }) async {
     _aborted = false;
@@ -103,6 +107,8 @@ class TestRunner {
           totalSteps: totalSteps,
           variables: testCase.variables,
           onSubTestProgress: onSubTestProgress,
+          llmFallbackOnFail: testCase.llmFallbackOnFail,
+          onStepActionUpdated: onStepActionUpdated,
         );
 
         onStepResult(result);
@@ -165,6 +171,8 @@ class TestRunner {
     required int stepNumber,
     required int totalSteps,
     void Function(TestCase, int, int, StepResult?)? onSubTestProgress,
+    bool llmFallbackOnFail = false,
+    void Function(String stepId, LlmAction newAction)? onStepActionUpdated,
   }) async {
     // Call steps run a referenced YAML file inline.
     if (step.call != null) {
@@ -191,8 +199,11 @@ class TestRunner {
     if (step.resolvedAction != null) {
       return _runPrecomputedStep(
         step: step,
+        variables: variables,
         stepNumber: stepNumber,
         totalSteps: totalSteps,
+        llmFallbackOnFail: llmFallbackOnFail,
+        onStepActionUpdated: onStepActionUpdated,
       );
     }
 
@@ -404,13 +415,17 @@ class TestRunner {
 
   /// Runs a step using its pre-computed [resolvedAction] from the coop builder.
   ///
-  /// No LLM call is made — the action is executed directly. If execution fails,
-  /// the step is marked as failed (the caller can choose to retry via LLM
-  /// by clearing the resolvedAction and re-running).
+  /// Retries up to 3 times with 1 s delay between attempts. If all retries
+  /// fail and [llmFallbackOnFail] is true, falls back to the LLM to resolve
+  /// the step live. When the LLM succeeds, [onStepActionUpdated] is called
+  /// so the caller can persist the new action for future runs.
   Future<StepResult> _runPrecomputedStep({
     required TestStep step,
+    required Map<String, String> variables,
     required int stepNumber,
     required int totalSteps,
+    bool llmFallbackOnFail = false,
+    void Function(String stepId, LlmAction newAction)? onStepActionUpdated,
   }) async {
     final stopwatch = Stopwatch()..start();
     final action = step.resolvedAction!;
@@ -450,44 +465,174 @@ class TestRunner {
       );
     }
 
-    try {
-      dev.log(_formatActionLog(action), name: 'MoraTests');
-      await webViewService.executeAction(action);
-      await Future.delayed(
-        const Duration(milliseconds: AppConstants.postActionDelayMs),
-      );
+    // ── Retry loop: 3 attempts with 1 s delay ──────────────────────────────
+    const maxAttempts = 3;
+    String? lastError;
 
-      final screenshotAfter = await _safeScreenshot();
-      dev.log('PASS (precomputed, ${_formatDuration(stopwatch.elapsed)})',
-          name: 'MoraTests');
+    for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        dev.log(
+          '  Attempt $attempt/$maxAttempts: ${_formatActionLog(action)}',
+          name: 'MoraTests',
+        );
+        await webViewService.executeAction(action);
+        await Future.delayed(
+          const Duration(milliseconds: AppConstants.postActionDelayMs),
+        );
 
-      return StepResult(
-        stepId: step.id,
-        success: true,
-        actionTaken: action,
-        screenshotBefore: screenshotBefore,
-        screenshotAfter: screenshotAfter,
-        rawLlmResponse: 'Precomputed action executed successfully',
-        duration: stopwatch.elapsed,
-        executedAt: DateTime.now(),
-      );
-    } catch (e) {
+        final screenshotAfter = await _safeScreenshot();
+        dev.log(
+          'PASS (precomputed, attempt $attempt, ${_formatDuration(stopwatch.elapsed)})',
+          name: 'MoraTests',
+        );
+
+        return StepResult(
+          stepId: step.id,
+          success: true,
+          actionTaken: action,
+          screenshotBefore: screenshotBefore,
+          screenshotAfter: screenshotAfter,
+          rawLlmResponse: 'Precomputed action executed successfully',
+          duration: stopwatch.elapsed,
+          executedAt: DateTime.now(),
+        );
+      } catch (e) {
+        lastError = e.toString();
+        final brief = lastError.split('\n').first;
+        dev.log(
+          '  Attempt $attempt/$maxAttempts failed: $brief',
+          name: 'MoraTests',
+        );
+        if (attempt < maxAttempts) {
+          await Future.delayed(const Duration(seconds: 1));
+        }
+      }
+    }
+
+    // ── All retries exhausted — optionally fall back to LLM ─────────────────
+    if (llmFallbackOnFail) {
       dev.log(
-        'Precomputed action failed: $e',
+        '  Precomputed retries exhausted — falling back to LLM',
         name: 'MoraTests',
       );
-      final fallback = await _safeScreenshot();
-      return StepResult(
-        stepId: step.id,
-        success: false,
-        actionTaken: action,
-        screenshotBefore: screenshotBefore,
-        screenshotAfter: fallback,
-        errorMessage: 'Precomputed action failed: $e',
-        duration: stopwatch.elapsed,
-        executedAt: DateTime.now(),
-      );
+      try {
+        final screenshot = await webViewService.screenshot();
+        final instruction = _interpolate(step.instruction, variables);
+        final hint =
+            step.hint != null ? _interpolate(step.hint!, variables) : null;
+        final assertion = step.assertion != null
+            ? _interpolate(step.assertion!, variables)
+            : null;
+
+        final llmAction = await llmService.interpretStep(
+          instruction: instruction,
+          screenshot: screenshot,
+          hint: hint,
+          assertion: assertion,
+          previousActionName: action.type.name,
+          previousError: lastError,
+        ).timeout(
+          Duration(seconds: step.timeoutSeconds),
+          onTimeout: () => throw TimeoutException(
+            'LLM fallback timed out after ${step.timeoutSeconds}s',
+          ),
+        );
+
+        final conf = '${(llmAction.confidence * 100).toStringAsFixed(0)}%';
+        dev.log(
+          '  LLM fallback: ${llmAction.type.name} ($conf)',
+          name: 'MoraTests',
+        );
+
+        if (llmAction.type == ActionType.done) {
+          onStepActionUpdated?.call(step.id, llmAction);
+          final after = await _safeScreenshot();
+          return StepResult(
+            stepId: step.id,
+            success: true,
+            actionTaken: llmAction,
+            screenshotBefore: screenshot,
+            screenshotAfter: after,
+            rawLlmResponse: llmAction.reasoning,
+            duration: stopwatch.elapsed,
+            executedAt: DateTime.now(),
+          );
+        }
+
+        if (llmAction.type == ActionType.fail) {
+          final after = await _safeScreenshot();
+          return StepResult(
+            stepId: step.id,
+            success: false,
+            actionTaken: llmAction,
+            screenshotBefore: screenshot,
+            screenshotAfter: after,
+            errorMessage: 'LLM fallback reported failure: ${llmAction.reasoning}',
+            rawLlmResponse: llmAction.reasoning,
+            duration: stopwatch.elapsed,
+            executedAt: DateTime.now(),
+          );
+        }
+
+        // Execute the LLM-resolved action
+        dev.log('  ${_formatActionLog(llmAction)}', name: 'MoraTests');
+        await webViewService.executeAction(llmAction);
+        await Future.delayed(
+          const Duration(milliseconds: AppConstants.postActionDelayMs),
+        );
+
+        // Notify caller to persist the new action
+        onStepActionUpdated?.call(step.id, llmAction);
+
+        final screenshotAfter = await _safeScreenshot();
+        dev.log(
+          'PASS (LLM fallback, ${_formatDuration(stopwatch.elapsed)})',
+          name: 'MoraTests',
+        );
+
+        return StepResult(
+          stepId: step.id,
+          success: true,
+          actionTaken: llmAction,
+          screenshotBefore: screenshot,
+          screenshotAfter: screenshotAfter,
+          rawLlmResponse: 'LLM fallback resolved and updated saved action',
+          duration: stopwatch.elapsed,
+          executedAt: DateTime.now(),
+        );
+      } catch (llmError) {
+        dev.log(
+          '  LLM fallback also failed: $llmError',
+          name: 'MoraTests',
+        );
+        final fallback = await _safeScreenshot();
+        return StepResult(
+          stepId: step.id,
+          success: false,
+          actionTaken: action,
+          screenshotBefore: screenshotBefore,
+          screenshotAfter: fallback,
+          errorMessage:
+              'Precomputed failed ($maxAttempts retries) and LLM fallback failed: $llmError',
+          duration: stopwatch.elapsed,
+          executedAt: DateTime.now(),
+        );
+      }
     }
+
+    // No LLM fallback — return failure
+    final fallback = await _safeScreenshot();
+    return StepResult(
+      stepId: step.id,
+      success: false,
+      actionTaken: action,
+      screenshotBefore: screenshotBefore,
+      screenshotAfter: fallback,
+      errorMessage:
+          'Precomputed action failed after $maxAttempts retries: $lastError',
+      duration: stopwatch.elapsed,
+      executedAt: DateTime.now(),
+    );
   }
 
   /// Interpolates all values in [map] using [variables].

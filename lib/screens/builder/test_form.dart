@@ -173,6 +173,26 @@ class _TestFormState extends State<TestForm> {
                     context.read<BuilderCubit>().setViewport(w, h);
                   },
                 ),
+                const SizedBox(height: 12),
+
+                // LLM fallback toggle
+                SwitchListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('LLM fallback on failure',
+                      style: TextStyle(fontSize: 14)),
+                  subtitle: const Text(
+                    'If a pre-computed action fails after 3 retries, '
+                    'use the AI to re-resolve the step',
+                    style: TextStyle(fontSize: 11),
+                  ),
+                  value: widget.test.llmFallbackOnFail,
+                  onChanged: (v) {
+                    cubit.updateTest(
+                      widget.test.copyWith(llmFallbackOnFail: v),
+                    );
+                  },
+                ),
                 const SizedBox(height: 16),
 
                 // Seeder

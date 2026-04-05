@@ -88,6 +88,7 @@ class StorageService {
       variables: _parseStringMap(yaml['variables']),
       viewportWidth: (yaml['viewport_width'] as int?) ?? 1280,
       viewportHeight: (yaml['viewport_height'] as int?) ?? 720,
+      llmFallbackOnFail: (yaml['llm_fallback_on_fail'] as bool?) ?? false,
       filePath: filePath,
     );
   }
@@ -148,6 +149,7 @@ class StorageService {
     if (tc.variables.isNotEmpty) map['variables'] = tc.variables;
     map['viewport_width'] = tc.viewportWidth;
     map['viewport_height'] = tc.viewportHeight;
+    if (tc.llmFallbackOnFail) map['llm_fallback_on_fail'] = true;
 
     map['steps'] = tc.steps.map(_stepToMap).toList();
     return map;

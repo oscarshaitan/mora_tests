@@ -21,6 +21,10 @@ abstract class TestCase with _$TestCase {
     @Default({}) Map<String, String> variables,
     @Default(1280) int viewportWidth,
     @Default(720) int viewportHeight,
+    /// When true, the runner will use the LLM to resolve a step if the
+    /// pre-computed action fails after all retries. The new action replaces
+    /// the saved one so subsequent runs benefit from the fix.
+    @Default(false) bool llmFallbackOnFail,
     @Default(TestStatus.idle) TestStatus status,
     String? filePath,
   }) = _TestCase;

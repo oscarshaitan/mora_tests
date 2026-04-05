@@ -1,7 +1,10 @@
+import 'dart:developer' as dev;
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../injection.dart';
+import '../../models/llm_action.dart';
 import '../../models/step_result.dart';
 import '../../models/test_case.dart';
 import '../../models/test_run.dart';
@@ -153,6 +156,11 @@ class RunnerCubit extends Cubit<RunnerState> {
       try {
         run = await _runner!.run(
           testCase: testCase,
+          onStepActionUpdated: (stepId, newAction) {
+            // Persist the LLM-resolved action back into the YAML file
+            // so subsequent runs use the updated action.
+            _persistUpdatedAction(testCase, stepId, newAction);
+          },
           onStepResult: (result) {
             completedSteps.add(result);
             // stepIndex points to the NEXT step to run (= completedSteps.length),
@@ -255,5 +263,32 @@ class RunnerCubit extends Cubit<RunnerState> {
     } else {
       emit(const RunnerState.idle());
     }
+  }
+
+  /// Persists an LLM-resolved action back into the test's YAML file.
+  /// Called when the LLM fallback resolves a step that the pre-computed
+  /// action couldn't handle, so future runs use the updated action.
+  void _persistUpdatedAction(
+    TestCase testCase,
+    String stepId,
+    LlmAction newAction,
+  ) {
+    if (testCase.filePath == null) return;
+    final updatedSteps = testCase.steps.map((s) {
+      if (s.id == stepId) return s.copyWith(resolvedAction: newAction);
+      return s;
+    }).toList();
+    final updatedTest = testCase.copyWith(steps: updatedSteps);
+    _storage.saveTestCase(updatedTest, testCase.filePath!).then((_) {
+      dev.log(
+        'Updated resolved action for step $stepId in ${testCase.filePath}',
+        name: 'MoraTests',
+      );
+    }).catchError((e) {
+      dev.log(
+        'Failed to persist updated action: $e',
+        name: 'MoraTests',
+      );
+    });
   }
 }
