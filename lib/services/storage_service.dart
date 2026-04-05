@@ -106,7 +106,6 @@ class StorageService {
       hint: yaml['hint']?.toString(),
       assertion: yaml['assert']?.toString(),
       timeoutSeconds: (yaml['timeout'] as int?) ?? 30,
-      maxSubSteps: yaml['max_sub_steps'] as int?,
       call: yaml['call']?.toString(),
       withVars: _parseStringMap(yaml['with']),
       resolvedAction: resolvedAction,
@@ -165,7 +164,6 @@ class StorageService {
       if (step.assertion != null && step.assertion!.isNotEmpty)
         'assert': step.assertion,
       'timeout': step.timeoutSeconds,
-      if (step.maxSubSteps != null) 'max_sub_steps': step.maxSubSteps,
       if (step.resolvedAction != null)
         'resolved_action': step.resolvedAction!.toJson(),
     };

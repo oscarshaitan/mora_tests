@@ -18,7 +18,6 @@ Tests are described in natural language YAML files. The **coop builder mode** le
 - [YAML Test Format](#yaml-test-format)
 - [Step Types](#step-types)
 - [Coop Builder Mode](#coop-builder-mode)
-- [Explore Mode](#explore-mode)
 - [Sub-test Calls](#sub-test-calls)
 - [How It Works](#how-it-works)
 - [Architecture](#architecture)
@@ -231,12 +230,6 @@ steps:
     hint: "Look for a blue button at the bottom of the form that says 'Sign In' or 'Login'"
     timeout: 20
 
-  # Explore step — LLM loops up to max_sub_steps times until it returns "done"
-  - id: "step-004"
-    instruction: "Navigate to the Companies section and open the Symterra account"
-    max_sub_steps: 8
-    timeout: 60
-
   # Standard step with assertion
   - id: "step-005"
     instruction: "Verify the dashboard loaded successfully"
@@ -274,7 +267,6 @@ steps:
 | `hint` | No | Extra guidance for the LLM (e.g. visual description, CSS selector hints) |
 | `assert` | No | Assertion the LLM should verify after acting |
 | `timeout` | No | Seconds to wait per LLM call (default: 30) |
-| `max_sub_steps` | No | Enables **Explore mode** — LLM loops up to this many times to reach the goal |
 | `call` | No | Path to another YAML file to run inline as a sub-test (relative to this file) |
 | `with` | No | Variable overrides passed into the sub-test (used with `call`) |
 | `resolved_action` | No | Pre-computed `LlmAction` saved by the coop builder. When present, the runner executes it directly without an LLM call |
@@ -330,17 +322,6 @@ After the action, the LLM also checks a condition. If the assertion fails, the s
   timeout: 20
 ```
 
-### Explore step
-
-Multi-turn: the LLM receives the current screenshot plus a log of sub-steps already taken, and loops until it signals `done` or the sub-step budget is exhausted. Use for navigating menus, filling multi-page forms, or any flow where the exact number of clicks is unpredictable.
-
-```yaml
-- id: "step-003"
-  instruction: "Navigate to Settings > Notifications and enable email alerts"
-  max_sub_steps: 10
-  timeout: 30
-```
-
 ### Call step
 
 Runs another YAML file inline as a sub-test. Useful for reusing a login sequence across many tests.
@@ -382,29 +363,11 @@ When a step has a `resolved_action`, the runner:
    - If the LLM succeeds, the new action is executed **and saved back** to the YAML file for future runs.
 3. If `llm_fallback_on_fail` is **disabled** (default), the step fails after 3 retries.
 
-Steps without a `resolved_action` (e.g. explore steps, call steps, or steps not yet resolved) use the original LLM pipeline.
+Steps without a `resolved_action` (e.g. call steps or steps not yet resolved) use the original LLM pipeline.
 
 ### Limitations (v1)
 
-- **Explore steps** (multi-turn) cannot be resolved in the builder and always use AI at runtime.
 - **Call steps** reference external YAML files and are excluded from coop resolution.
-
----
-
-## Explore Mode
-
-When a step has `max_sub_steps` set, the runner enters a multi-turn loop:
-
-1. Take a screenshot of the current state
-2. Call the LLM with the instruction **plus the full history** of actions already taken
-3. Execute the returned action and record it as a factual, past-tense history entry
-4. Repeat until the LLM returns `done` (success), `fail` (failure), or the sub-step budget is exhausted
-
-Use explore mode for multi-step flows where the exact number of actions is not known in advance — navigating through menus, filling multi-page forms, or completing any workflow that requires the LLM to reason about intermediate state.
-
-**History capping:** the last 6 sub-step history entries are sent to the LLM to bound token usage while still providing enough context.
-
-**Repeat-type guard:** if the LLM proposes typing the same value that already appears in history, the step immediately succeeds. This handles password fields (which show only dots after typing) and other inputs where visual confirmation is unavailable.
 
 ---
 
@@ -511,9 +474,6 @@ This guarantees every test starts from a logged-out baseline regardless of what 
   └─ Save test with                    │   │   ├─ llmService.interpretStep()
      resolved_action per step          │   │   └─ webViewService.executeAction()
                                        │   │
-                                       │   ├─ Explore step (max_sub_steps set)
-                                       │   │   └─ Loops with history until LLM returns "done"
-                                       │   │
                                        │   └─ Call step (call: path/to/sub.yaml)
                                        │       └─ Loads sub-test, merges variables, runs inline
                                        │
@@ -525,7 +485,7 @@ This guarantees every test starts from a logged-out baseline regardless of what 
 
 | Component | File | Responsibility |
 |-----------|------|----------------|
-| `TestRunner` | `lib/services/test_runner.dart` | Orchestrates step execution, explore loops, call steps |
+| `TestRunner` | `lib/services/test_runner.dart` | Orchestrates step execution, pre-computed actions, call steps |
 | `LlmService` | `lib/services/llm_service.dart` | OpenAI-compatible vision API; fallback model; rate-limit retry |
 | `WebViewService` | `lib/services/webview_service.dart` | CDP + JS action dispatch; screenshot; session cleanup |
 | `JsBuilder` | `lib/services/js_builder.dart` | Generates JavaScript strings for each action type |
@@ -580,7 +540,7 @@ lib/
 │   └── exceptions.dart         # StorageException, LlmException, HookException
 ├── models/                     # freezed data models
 │   ├── test_case.dart          # id, name, startUrl, seeder, teardown, steps, variables, viewport, llmFallbackOnFail
-│   ├── test_step.dart          # instruction, hint, assert, timeout, maxSubSteps, call, withVars, resolvedAction
+│   ├── test_step.dart          # instruction, hint, assert, timeout, call, withVars, resolvedAction
 │   ├── http_hook.dart          # url, method, headers, body, timeoutSeconds
 │   ├── llm_action.dart         # ActionType enum + LlmAction (x, y, value, key, ...)
 │   ├── step_result.dart        # stepId, success, screenshots, duration, subStepResults
@@ -591,7 +551,7 @@ lib/
 │   ├── js_builder.dart         # generates JS for each ActionType
 │   ├── llm_service.dart        # OpenAI-compatible vision API (OVH and Vertex AI)
 │   ├── http_hook_service.dart  # seeder / teardown HTTP calls
-│   ├── test_runner.dart        # orchestration (standard, explore, and call-step modes)
+│   ├── test_runner.dart        # orchestration (pre-computed, standard LLM, and call-step modes)
 │   └── storage_service.dart    # YAML load/save, run persistence
 ├── cubits/
 │   ├── builder/                # BuilderCubit + BuilderState (coop builder with live WebView)
@@ -602,7 +562,7 @@ lib/
 │   ├── builder/
 │   │   ├── builder_screen.dart
 │   │   ├── test_form.dart
-│   │   └── step_list_editor.dart  # Normal / Explore / Call sub-test step modes
+│   │   └── step_list_editor.dart  # Normal / Call sub-test step modes + AI coop controls
 │   ├── runner/
 │   │   ├── runner_screen.dart
 │   │   ├── run_view.dart

@@ -297,7 +297,6 @@ void main() {
       String? assertion,
       String? previousActionName,
       String? previousError,
-      List<String>? subHistory,
     }) async {
       http.Request? captured;
       await http.runWithClient(
@@ -308,7 +307,6 @@ void main() {
           assertion: assertion,
           previousActionName: previousActionName,
           previousError: previousError,
-          subHistory: subHistory,
         ),
         () => MockClient((req) async {
           captured = req;
@@ -365,18 +363,6 @@ void main() {
           ((body['messages'] as List).last['content'] as List);
       final text = (userContent.last as Map)['text'] as String;
       expect(text, contains('PREVIOUS ERROR: Element not found'));
-    });
-
-    test('subHistory is included in explore mode', () async {
-      final body = await captureBody(
-        subHistory: ['sub-step 1: click (100,200) — done', 'sub-step 2: type "admin"'],
-      );
-      final userContent =
-          ((body['messages'] as List).last['content'] as List);
-      final text = (userContent.last as Map)['text'] as String;
-      expect(text, contains('EXPLORE MODE'));
-      expect(text, contains('sub-step 1'));
-      expect(text, contains('sub-step 2'));
     });
 
     test('empty hint is omitted from text parts', () async {

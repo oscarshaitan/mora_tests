@@ -8,7 +8,7 @@ import '../../models/llm_action.dart';
 import '../../models/test_case.dart';
 import '../../models/test_step.dart';
 
-enum _StepMode { normal, explore, call }
+enum _StepMode { normal, call }
 
 class StepListEditor extends StatelessWidget {
   final TestCase test;
@@ -103,7 +103,6 @@ class _StepCardState extends State<_StepCard> {
   late TextEditingController _hintCtrl;
   late TextEditingController _assertCtrl;
   late TextEditingController _timeoutCtrl;
-  late TextEditingController _subStepsCtrl;
   late TextEditingController _callCtrl;
   late List<_WithVarEntry> _withVarsEntries;
 
@@ -114,19 +113,11 @@ class _StepCardState extends State<_StepCard> {
   }
 
   void _initFrom(TestStep step) {
-    if (step.call != null) {
-      _mode = _StepMode.call;
-    } else if (step.maxSubSteps != null) {
-      _mode = _StepMode.explore;
-    } else {
-      _mode = _StepMode.normal;
-    }
+    _mode = step.call != null ? _StepMode.call : _StepMode.normal;
     _instructionCtrl = TextEditingController(text: step.instruction);
     _hintCtrl = TextEditingController(text: step.hint ?? '');
     _assertCtrl = TextEditingController(text: step.assertion ?? '');
     _timeoutCtrl = TextEditingController(text: step.timeoutSeconds.toString());
-    _subStepsCtrl =
-        TextEditingController(text: (step.maxSubSteps ?? 10).toString());
     _callCtrl = TextEditingController(text: step.call ?? '');
     _withVarsEntries = step.withVars.entries
         .map((e) => _WithVarEntry(
@@ -141,7 +132,6 @@ class _StepCardState extends State<_StepCard> {
     _hintCtrl.dispose();
     _assertCtrl.dispose();
     _timeoutCtrl.dispose();
-    _subStepsCtrl.dispose();
     _callCtrl.dispose();
     for (final e in _withVarsEntries) {
       e.keyCtrl.dispose();
@@ -174,8 +164,6 @@ class _StepCardState extends State<_StepCard> {
           ? null
           : _assertCtrl.text,
       timeoutSeconds: int.tryParse(_timeoutCtrl.text) ?? 30,
-      maxSubSteps:
-          _mode == _StepMode.explore ? (int.tryParse(_subStepsCtrl.text) ?? 10) : null,
       call: _mode == _StepMode.call
           ? (_callCtrl.text.isEmpty ? null : _callCtrl.text)
           : null,
@@ -312,11 +300,6 @@ class _StepCardState extends State<_StepCard> {
                   icon: Icon(Icons.play_arrow_outlined, size: 16),
                 ),
                 ButtonSegment(
-                  value: _StepMode.explore,
-                  label: Text('Explore'),
-                  icon: Icon(Icons.explore_outlined, size: 16),
-                ),
-                ButtonSegment(
                   value: _StepMode.call,
                   label: Text('Call sub-test'),
                   icon: Icon(Icons.call_merge, size: 16),
@@ -388,22 +371,6 @@ class _StepCardState extends State<_StepCard> {
                       onChanged: (_) => _notify(),
                     ),
                   ),
-                  if (_mode == _StepMode.explore) ...[
-                    const SizedBox(width: 16),
-                    SizedBox(
-                      width: 100,
-                      child: TextFormField(
-                        controller: _subStepsCtrl,
-                        decoration: const InputDecoration(
-                          labelText: 'Max sub-steps',
-                          border: OutlineInputBorder(),
-                          isDense: true,
-                        ),
-                        keyboardType: TextInputType.number,
-                        onChanged: (_) => _notify(),
-                      ),
-                    ),
-                  ],
                 ],
               ),
 
@@ -414,35 +381,6 @@ class _StepCardState extends State<_StepCard> {
                 mode: _mode,
                 isResolving: widget.isResolving,
                 pendingAction: widget.pendingAction,
-              ),
-            ],
-
-            // ── Explore mode info ─────────────────────────────────────
-            if (_mode == _StepMode.explore) ...[
-              const SizedBox(height: 10),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                decoration: BoxDecoration(
-                  color: colorScheme.surfaceContainerLow,
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: colorScheme.outlineVariant),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.info_outline,
-                        size: 14, color: colorScheme.onSurfaceVariant),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Explore steps use AI at runtime (multi-turn)',
-                        style: TextStyle(
-                            fontSize: 11,
-                            color: colorScheme.onSurfaceVariant),
-                      ),
-                    ),
-                  ],
-                ),
               ),
             ],
 
@@ -590,9 +528,6 @@ class _AiCoopSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final cubit = context.read<BuilderCubit>();
     final cs = Theme.of(context).colorScheme;
-
-    // Explore steps don't support coop resolution
-    if (mode == _StepMode.explore) return const SizedBox.shrink();
 
     // Show pending action preview with accept/reject
     if (pendingAction != null) {

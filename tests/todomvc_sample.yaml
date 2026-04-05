@@ -9,7 +9,6 @@ steps:
     instruction: "Wait until the todo input field is visible"
     hint: "The input has placeholder text 'What needs to be done?'"
     timeout: 15
-    max_sub_steps: 3
 
   - id: "s-add-first"
     instruction: "Type 'Buy groceries' into the todo input field and press Enter"

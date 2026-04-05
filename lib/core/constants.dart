@@ -22,6 +22,5 @@ class AppConstants {
   static const int rateLimitDelaySeconds = 10;
   static const int settleDelayMs = 1500;
   static const int postActionDelayMs = 1200;
-  static const int exploreHistorySize = 6;
   static const String testFileExtension = '.yaml';
 }

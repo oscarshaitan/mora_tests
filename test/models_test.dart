@@ -137,24 +137,13 @@ void main() {
   // ── TestStep ───────────────────────────────────────────────────────────────
 
   group('TestStep', () {
-    test('defaults: timeoutSeconds=30, maxSubSteps=null, call=null', () {
+    test('defaults: timeoutSeconds=30, call=null', () {
       const step = TestStep(id: 's1', instruction: 'Do thing');
       expect(step.timeoutSeconds, equals(30));
-      expect(step.maxSubSteps, isNull);
       expect(step.call, isNull);
       expect(step.withVars, isEmpty);
       expect(step.hint, isNull);
       expect(step.assertion, isNull);
-    });
-
-    test('explore step has maxSubSteps set', () {
-      const step = TestStep(
-        id: 's2',
-        instruction: 'Navigate to section',
-        maxSubSteps: 10,
-      );
-      expect(step.maxSubSteps, equals(10));
-      expect(step.call, isNull);
     });
 
     test('call step has call path and withVars', () {

@@ -146,34 +146,6 @@ steps:
       expect(tc.steps.first.timeoutSeconds, equals(30));
     });
 
-    test('parses explore step with max_sub_steps', () async {
-      final file = await writeYaml('explore.yaml', '''
-id: "test-007"
-name: "Explore Test"
-start_url: "https://example.com"
-steps:
-  - id: "s1"
-    instruction: "Navigate to companies"
-    max_sub_steps: 8
-    timeout: 60
-''');
-      final tc = await storage.loadTestCase(file.path);
-      expect(tc.steps.first.maxSubSteps, equals(8));
-    });
-
-    test('maxSubSteps is null for standard steps', () async {
-      final file = await writeYaml('no_max.yaml', '''
-id: "test-008"
-name: "Standard Step"
-start_url: "https://example.com"
-steps:
-  - id: "s1"
-    instruction: "Click button"
-''');
-      final tc = await storage.loadTestCase(file.path);
-      expect(tc.steps.first.maxSubSteps, isNull);
-    });
-
     test('parses call step with with-vars', () async {
       final file = await writeYaml('call_step.yaml', '''
 id: "test-009"
