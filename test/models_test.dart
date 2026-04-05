@@ -173,6 +173,40 @@ void main() {
       const b = TestStep(id: 'x', instruction: 'Click OK', timeoutSeconds: 15);
       expect(a, equals(b));
     });
+
+    test('resolvedAction defaults to null', () {
+      const step = TestStep(id: 's1', instruction: 'Do thing');
+      expect(step.resolvedAction, isNull);
+    });
+
+    test('stores resolvedAction when set', () {
+      const action = LlmAction(
+        type: ActionType.click,
+        x: 245,
+        y: 312,
+        confidence: 0.95,
+        reasoning: 'Click login button',
+      );
+      const step = TestStep(
+        id: 's4',
+        instruction: 'Click login',
+        resolvedAction: action,
+      );
+      expect(step.resolvedAction, isNotNull);
+      expect(step.resolvedAction!.type, equals(ActionType.click));
+      expect(step.resolvedAction!.x, equals(245));
+    });
+
+    test('copyWith can set and clear resolvedAction', () {
+      const action = LlmAction(type: ActionType.type, value: 'hello');
+      const step = TestStep(id: 's5', instruction: 'Type hello');
+      final withAction = step.copyWith(resolvedAction: action);
+      expect(withAction.resolvedAction, isNotNull);
+      expect(withAction.resolvedAction!.value, equals('hello'));
+
+      final cleared = withAction.copyWith(resolvedAction: null);
+      expect(cleared.resolvedAction, isNull);
+    });
   });
 
   // ── TestCase ───────────────────────────────────────────────────────────────
@@ -226,6 +260,29 @@ void main() {
       expect(tc.id, equals('rt-tc'));
       expect(tc.name, equals('Roundtrip TC'));
       expect(tc.startUrl, equals('https://example.com'));
+    });
+
+    test('viewport defaults to 1280x720', () {
+      const tc = TestCase(id: 'tc1', name: 'Test');
+      expect(tc.viewportWidth, equals(1280));
+      expect(tc.viewportHeight, equals(720));
+    });
+
+    test('llmFallbackOnFail defaults to false', () {
+      const tc = TestCase(id: 'tc1', name: 'Test');
+      expect(tc.llmFallbackOnFail, isFalse);
+    });
+
+    test('copyWith can update viewport and llmFallbackOnFail', () {
+      const tc = TestCase(id: 'tc4', name: 'Test');
+      final updated = tc.copyWith(
+        viewportWidth: 1920,
+        viewportHeight: 1080,
+        llmFallbackOnFail: true,
+      );
+      expect(updated.viewportWidth, equals(1920));
+      expect(updated.viewportHeight, equals(1080));
+      expect(updated.llmFallbackOnFail, isTrue);
     });
   });
 

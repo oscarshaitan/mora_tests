@@ -1,0 +1,54 @@
+id: "sample-todomvc-001"
+name: "TodoMVC - Add and complete tasks"
+description: "Demonstrates Mora Tests on a public TodoMVC React app: adds items, marks them complete, and verifies the filtered views."
+start_url: "https://todomvc.com/examples/react/dist/"
+viewport_width: 1280
+viewport_height: 720
+steps:
+  - id: "s-wait-load"
+    instruction: "Wait until the todo input field is visible"
+    hint: "The input has placeholder text 'What needs to be done?'"
+    timeout: 15
+    max_sub_steps: 3
+
+  - id: "s-add-first"
+    instruction: "Type 'Buy groceries' into the todo input field and press Enter"
+    hint: "The input is at the top of the page with placeholder 'What needs to be done?'"
+    timeout: 20
+
+  - id: "s-add-second"
+    instruction: "Type 'Walk the dog' into the todo input field and press Enter"
+    timeout: 20
+
+  - id: "s-add-third"
+    instruction: "Type 'Read a book' into the todo input field and press Enter"
+    timeout: 20
+
+  - id: "s-verify-count"
+    instruction: "Verify that the item count shows '3 items left'"
+    assert: "The footer should display '3 items left'"
+    timeout: 15
+
+  - id: "s-complete-first"
+    instruction: "Click the toggle checkbox next to 'Buy groceries' to mark it as complete"
+    hint: "Each todo item has a round checkbox on the left side"
+    timeout: 20
+
+  - id: "s-verify-completed"
+    instruction: "Verify the item count now shows '2 items left'"
+    assert: "The footer should display '2 items left'"
+    timeout: 15
+
+  - id: "s-filter-active"
+    instruction: "Click the 'Active' filter link in the footer"
+    hint: "The footer has three filter links: All, Active, Completed"
+    timeout: 15
+
+  - id: "s-verify-active-filter"
+    instruction: "Verify that only 'Walk the dog' and 'Read a book' are visible"
+    assert: "'Buy groceries' should not be visible since it is completed"
+    timeout: 15
+
+  - id: "s-filter-all"
+    instruction: "Click the 'All' filter link to show all items again"
+    timeout: 15

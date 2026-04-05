@@ -8,6 +8,7 @@ import 'package:mora_tests/models/llm_action.dart';
 import 'package:mora_tests/models/step_result.dart';
 import 'package:mora_tests/models/test_case.dart';
 import 'package:mora_tests/models/test_run.dart';
+import 'package:mora_tests/models/test_step.dart';
 import 'package:mora_tests/services/storage_service.dart';
 import 'package:path/path.dart' as p;
 
@@ -309,6 +310,92 @@ steps:
       expect(tc.steps[1].instruction, equals('Second step'));
       expect(tc.steps[2].instruction, equals('Third step'));
     });
+
+    test('parses viewport dimensions', () async {
+      final file = await writeYaml('viewport.yaml', '''
+id: "test-vp"
+name: "Viewport Test"
+start_url: "https://example.com"
+viewport_width: 1920
+viewport_height: 1080
+steps: []
+''');
+      final tc = await storage.loadTestCase(file.path);
+      expect(tc.viewportWidth, equals(1920));
+      expect(tc.viewportHeight, equals(1080));
+    });
+
+    test('viewport defaults to 1280x720 when absent', () async {
+      final file = await writeYaml('no_viewport.yaml', '''
+id: "test-novp"
+name: "No Viewport"
+start_url: "https://example.com"
+steps: []
+''');
+      final tc = await storage.loadTestCase(file.path);
+      expect(tc.viewportWidth, equals(1280));
+      expect(tc.viewportHeight, equals(720));
+    });
+
+    test('parses llm_fallback_on_fail flag', () async {
+      final file = await writeYaml('fallback.yaml', '''
+id: "test-fb"
+name: "Fallback Test"
+start_url: "https://example.com"
+llm_fallback_on_fail: true
+steps: []
+''');
+      final tc = await storage.loadTestCase(file.path);
+      expect(tc.llmFallbackOnFail, isTrue);
+    });
+
+    test('llmFallbackOnFail defaults to false when absent', () async {
+      final file = await writeYaml('no_fallback.yaml', '''
+id: "test-nofb"
+name: "No Fallback"
+start_url: "https://example.com"
+steps: []
+''');
+      final tc = await storage.loadTestCase(file.path);
+      expect(tc.llmFallbackOnFail, isFalse);
+    });
+
+    test('parses step with resolved_action', () async {
+      final file = await writeYaml('resolved.yaml', '''
+id: "test-res"
+name: "Resolved Action Test"
+start_url: "https://example.com"
+steps:
+  - id: "s1"
+    instruction: "Click login"
+    timeout: 30
+    resolved_action:
+      type: click
+      x: 245.0
+      y: 312.0
+      confidence: 0.95
+      reasoning: "Click the login button"
+''');
+      final tc = await storage.loadTestCase(file.path);
+      expect(tc.steps.first.resolvedAction, isNotNull);
+      expect(tc.steps.first.resolvedAction!.type.name, equals('click'));
+      expect(tc.steps.first.resolvedAction!.x, equals(245.0));
+      expect(tc.steps.first.resolvedAction!.y, equals(312.0));
+      expect(tc.steps.first.resolvedAction!.confidence, equals(0.95));
+    });
+
+    test('resolvedAction is null when absent from step', () async {
+      final file = await writeYaml('no_resolved.yaml', '''
+id: "test-nores"
+name: "No Resolved"
+start_url: "https://example.com"
+steps:
+  - id: "s1"
+    instruction: "Click button"
+''');
+      final tc = await storage.loadTestCase(file.path);
+      expect(tc.steps.first.resolvedAction, isNull);
+    });
   });
 
   // ── loadTestCasesFromDirectory ────────────────────────────────────────────
@@ -386,6 +473,56 @@ steps: []
       expect(reloaded.startUrl, equals(original.startUrl));
       expect(reloaded.variables['user'], equals('alice'));
       expect(reloaded.variables['role'], equals('admin'));
+    });
+
+    test('roundtrips viewport and llmFallbackOnFail', () async {
+      final original = TestCase(
+        id: 'rt-vp',
+        name: 'Viewport Roundtrip',
+        startUrl: 'https://example.com',
+        viewportWidth: 1920,
+        viewportHeight: 1080,
+        llmFallbackOnFail: true,
+        steps: [],
+      );
+
+      final filePath = p.join(tempDir.path, 'roundtrip_vp.yaml');
+      await storage.saveTestCase(original, filePath);
+      final reloaded = await storage.loadTestCase(filePath);
+
+      expect(reloaded.viewportWidth, equals(1920));
+      expect(reloaded.viewportHeight, equals(1080));
+      expect(reloaded.llmFallbackOnFail, isTrue);
+    });
+
+    test('roundtrips step with resolvedAction', () async {
+      final original = TestCase(
+        id: 'rt-ra',
+        name: 'Resolved Action Roundtrip',
+        startUrl: 'https://example.com',
+        steps: [
+          const TestStep(
+            id: 's1',
+            instruction: 'Click login',
+            resolvedAction: LlmAction(
+              type: ActionType.click,
+              x: 100,
+              y: 200,
+              confidence: 0.9,
+              reasoning: 'Click the button',
+            ),
+          ),
+        ],
+      );
+
+      final filePath = p.join(tempDir.path, 'roundtrip_ra.yaml');
+      await storage.saveTestCase(original, filePath);
+      final reloaded = await storage.loadTestCase(filePath);
+
+      expect(reloaded.steps.first.resolvedAction, isNotNull);
+      expect(reloaded.steps.first.resolvedAction!.type, equals(ActionType.click));
+      expect(reloaded.steps.first.resolvedAction!.x, equals(100));
+      expect(reloaded.steps.first.resolvedAction!.y, equals(200));
     });
 
     test('throws StorageException when path is not writable', () async {
