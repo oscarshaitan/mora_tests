@@ -6,6 +6,7 @@ import '../../cubits/builder/builder_cubit.dart';
 import '../../cubits/builder/builder_state.dart';
 import '../../models/test_case.dart';
 import '../../services/webview_service.dart';
+import '../../widgets/action_overlay.dart';
 import 'test_form.dart';
 
 class BuilderScreen extends StatelessWidget {
@@ -291,7 +292,7 @@ class _BuilderWebViewPanel extends StatelessWidget {
             ],
           ),
         ),
-        // WebView constrained to viewport dimensions
+        // WebView constrained to viewport dimensions, with action overlay
         Expanded(
           child: Center(
             child: Container(
@@ -300,9 +301,28 @@ class _BuilderWebViewPanel extends StatelessWidget {
               decoration: BoxDecoration(
                 border: Border.all(color: cs.outlineVariant),
               ),
-              child: _BuilderInAppWebView(
-                webViewService: cubit.webViewService,
-                onReady: cubit.onWebViewReady,
+              child: BlocBuilder<BuilderCubit, BuilderState>(
+                buildWhen: (prev, curr) =>
+                    prev.pendingAction != curr.pendingAction,
+                builder: (context, state) {
+                  return Stack(
+                    children: [
+                      _BuilderInAppWebView(
+                        webViewService: cubit.webViewService,
+                        onReady: cubit.onWebViewReady,
+                      ),
+                      if (state.pendingAction != null)
+                        Positioned.fill(
+                          child: IgnorePointer(
+                            child: ActionOverlay(
+                              action: state.pendingAction!,
+                              dpr: cubit.webViewService.dpr,
+                            ),
+                          ),
+                        ),
+                    ],
+                  );
+                },
               ),
             ),
           ),
