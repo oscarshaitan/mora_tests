@@ -345,7 +345,14 @@ The builder tab provides a **three-panel layout**: test list, form editor, and a
 1. **Create or open a test** in the builder. The WebView navigates to the test's `start_url`.
 2. **Write a step instruction** (e.g. "Click the login button").
 3. **Click "Ask AI"** on the step card. The builder takes a screenshot and sends it with the instruction to the LLM.
-4. The AI returns a suggested action (e.g. `click at (245, 312)`) displayed in a preview card with confidence and reasoning.
+4. The AI returns a suggested action (e.g. `click at (245, 312)`) displayed in a preview card with confidence and reasoning. A **visual overlay** appears on the live WebView showing exactly where/what the action targets:
+   - **click / doubleClick / longPress / hover** — animated crosshair at the target coordinates
+   - **type / selectOption** — crosshair + floating text bubble with the value to be entered
+   - **scroll** — directional arrow with pixel delta
+   - **navigate** — top banner with the target URL
+   - **pressKey** — centered key cap (e.g. `[Enter]`)
+   - **assert_*** — bottom banner with the assertion text
+   - **done / fail** — centered green checkmark or red X
 5. **Accept** the action: it is saved as `resolved_action` on the step and executed on the WebView to advance the page state. **Reject** to discard and try again.
 6. **Save the test**. The YAML file now contains the pre-computed action for each resolved step.
 
@@ -569,6 +576,7 @@ lib/
 │   │   └── results_view.dart
 │   └── settings_screen.dart        # provider cards with per-provider config dialogs
 └── widgets/
+    ├── action_overlay.dart         # visual overlay for pending AI actions on builder WebView
     ├── step_card.dart
     ├── screenshot_panel.dart
     ├── test_case_tile.dart
