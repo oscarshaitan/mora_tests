@@ -164,6 +164,15 @@ class _TestFormState extends State<TestForm> {
                   label: 'Description (optional)',
                   onChanged: (_) => _pushUpdate(context),
                 ),
+                const SizedBox(height: 10),
+
+                // Viewport
+                _ViewportEditor(
+                  test: widget.test,
+                  onChanged: (w, h) {
+                    context.read<BuilderCubit>().setViewport(w, h);
+                  },
+                ),
                 const SizedBox(height: 16),
 
                 // Seeder
@@ -485,4 +494,118 @@ class _VarEntry {
   final TextEditingController keyCtrl;
   final TextEditingController valCtrl;
   _VarEntry({required this.keyCtrl, required this.valCtrl});
+}
+
+// ── Viewport Editor ────────────────────────────────────────────────────────
+
+class _ViewportEditor extends StatefulWidget {
+  final TestCase test;
+  final void Function(int width, int height) onChanged;
+
+  const _ViewportEditor({required this.test, required this.onChanged});
+
+  @override
+  State<_ViewportEditor> createState() => _ViewportEditorState();
+}
+
+class _ViewportEditorState extends State<_ViewportEditor> {
+  late TextEditingController _widthCtrl;
+  late TextEditingController _heightCtrl;
+
+  static const _presets = <String, (int, int)>{
+    '1280 x 720': (1280, 720),
+    '1920 x 1080': (1920, 1080),
+    '1024 x 768': (1024, 768),
+    '375 x 812 (mobile)': (375, 812),
+    '768 x 1024 (tablet)': (768, 1024),
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    _widthCtrl =
+        TextEditingController(text: widget.test.viewportWidth.toString());
+    _heightCtrl =
+        TextEditingController(text: widget.test.viewportHeight.toString());
+  }
+
+  @override
+  void didUpdateWidget(_ViewportEditor old) {
+    super.didUpdateWidget(old);
+    if (old.test.id != widget.test.id) {
+      _widthCtrl.dispose();
+      _heightCtrl.dispose();
+      _widthCtrl =
+          TextEditingController(text: widget.test.viewportWidth.toString());
+      _heightCtrl =
+          TextEditingController(text: widget.test.viewportHeight.toString());
+    }
+  }
+
+  @override
+  void dispose() {
+    _widthCtrl.dispose();
+    _heightCtrl.dispose();
+    super.dispose();
+  }
+
+  void _notify() {
+    final w = int.tryParse(_widthCtrl.text) ?? 1280;
+    final h = int.tryParse(_heightCtrl.text) ?? 720;
+    widget.onChanged(w, h);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        SizedBox(
+          width: 100,
+          child: TextFormField(
+            controller: _widthCtrl,
+            decoration: const InputDecoration(
+              labelText: 'Width',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+            keyboardType: TextInputType.number,
+            onChanged: (_) => _notify(),
+          ),
+        ),
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 8),
+          child: Text('x'),
+        ),
+        SizedBox(
+          width: 100,
+          child: TextFormField(
+            controller: _heightCtrl,
+            decoration: const InputDecoration(
+              labelText: 'Height',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+            keyboardType: TextInputType.number,
+            onChanged: (_) => _notify(),
+          ),
+        ),
+        const SizedBox(width: 8),
+        PopupMenuButton<String>(
+          icon: const Icon(Icons.aspect_ratio, size: 20),
+          tooltip: 'Viewport presets',
+          onSelected: (key) {
+            final preset = _presets[key]!;
+            setState(() {
+              _widthCtrl.text = preset.$1.toString();
+              _heightCtrl.text = preset.$2.toString();
+            });
+            widget.onChanged(preset.$1, preset.$2);
+          },
+          itemBuilder: (_) => _presets.keys
+              .map((k) => PopupMenuItem(value: k, child: Text(k)))
+              .toList(),
+        ),
+      ],
+    );
+  }
 }

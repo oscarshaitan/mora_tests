@@ -187,6 +187,15 @@ class TestRunner {
       );
     }
 
+    // Pre-computed action from coop builder mode — skip LLM entirely.
+    if (step.resolvedAction != null) {
+      return _runPrecomputedStep(
+        step: step,
+        stepNumber: stepNumber,
+        totalSteps: totalSteps,
+      );
+    }
+
     final stopwatch = Stopwatch()..start();
     final instruction = _interpolate(step.instruction, variables);
     final hint = step.hint != null ? _interpolate(step.hint!, variables) : null;
@@ -391,6 +400,94 @@ class TestRunner {
       executedAt: DateTime.now(),
       subStepResults: subResults,
     );
+  }
+
+  /// Runs a step using its pre-computed [resolvedAction] from the coop builder.
+  ///
+  /// No LLM call is made — the action is executed directly. If execution fails,
+  /// the step is marked as failed (the caller can choose to retry via LLM
+  /// by clearing the resolvedAction and re-running).
+  Future<StepResult> _runPrecomputedStep({
+    required TestStep step,
+    required int stepNumber,
+    required int totalSteps,
+  }) async {
+    final stopwatch = Stopwatch()..start();
+    final action = step.resolvedAction!;
+
+    dev.log('─' * 56, name: 'MoraTests');
+    dev.log(
+      'Step $stepNumber/$totalSteps [Precomputed]: ${step.instruction}',
+      name: 'MoraTests',
+    );
+
+    final screenshotBefore = await _safeScreenshot() ?? _emptyPng();
+
+    if (action.type == ActionType.done) {
+      return StepResult(
+        stepId: step.id,
+        success: true,
+        actionTaken: action,
+        screenshotBefore: screenshotBefore,
+        screenshotAfter: screenshotBefore,
+        rawLlmResponse: 'Precomputed: done',
+        duration: stopwatch.elapsed,
+        executedAt: DateTime.now(),
+      );
+    }
+
+    if (action.type == ActionType.fail) {
+      return StepResult(
+        stepId: step.id,
+        success: false,
+        actionTaken: action,
+        screenshotBefore: screenshotBefore,
+        screenshotAfter: screenshotBefore,
+        errorMessage: 'Precomputed: ${action.reasoning}',
+        rawLlmResponse: action.reasoning,
+        duration: stopwatch.elapsed,
+        executedAt: DateTime.now(),
+      );
+    }
+
+    try {
+      dev.log(_formatActionLog(action), name: 'MoraTests');
+      await webViewService.executeAction(action);
+      await Future.delayed(
+        const Duration(milliseconds: AppConstants.postActionDelayMs),
+      );
+
+      final screenshotAfter = await _safeScreenshot();
+      dev.log('PASS (precomputed, ${_formatDuration(stopwatch.elapsed)})',
+          name: 'MoraTests');
+
+      return StepResult(
+        stepId: step.id,
+        success: true,
+        actionTaken: action,
+        screenshotBefore: screenshotBefore,
+        screenshotAfter: screenshotAfter,
+        rawLlmResponse: 'Precomputed action executed successfully',
+        duration: stopwatch.elapsed,
+        executedAt: DateTime.now(),
+      );
+    } catch (e) {
+      dev.log(
+        'Precomputed action failed: $e',
+        name: 'MoraTests',
+      );
+      final fallback = await _safeScreenshot();
+      return StepResult(
+        stepId: step.id,
+        success: false,
+        actionTaken: action,
+        screenshotBefore: screenshotBefore,
+        screenshotAfter: fallback,
+        errorMessage: 'Precomputed action failed: $e',
+        duration: stopwatch.elapsed,
+        executedAt: DateTime.now(),
+      );
+    }
   }
 
   /// Interpolates all values in [map] using [variables].

@@ -86,11 +86,19 @@ class StorageService {
           : null,
       steps: steps,
       variables: _parseStringMap(yaml['variables']),
+      viewportWidth: (yaml['viewport_width'] as int?) ?? 1280,
+      viewportHeight: (yaml['viewport_height'] as int?) ?? 720,
       filePath: filePath,
     );
   }
 
   TestStep _parseStep(YamlMap yaml) {
+    LlmAction? resolvedAction;
+    if (yaml['resolved_action'] != null) {
+      final raw = yaml['resolved_action'] as YamlMap;
+      resolvedAction =
+          LlmAction.fromJson(Map<String, Object?>.from(raw));
+    }
     return TestStep(
       id: yaml['id']?.toString() ?? _uuid.v4(),
       instruction: yaml['instruction']?.toString() ?? '',
@@ -100,6 +108,7 @@ class StorageService {
       maxSubSteps: yaml['max_sub_steps'] as int?,
       call: yaml['call']?.toString(),
       withVars: _parseStringMap(yaml['with']),
+      resolvedAction: resolvedAction,
     );
   }
 
@@ -137,6 +146,8 @@ class StorageService {
     if (tc.seeder != null) map['seeder'] = _hookToMap(tc.seeder!);
     if (tc.teardown != null) map['teardown'] = _hookToMap(tc.teardown!);
     if (tc.variables.isNotEmpty) map['variables'] = tc.variables;
+    map['viewport_width'] = tc.viewportWidth;
+    map['viewport_height'] = tc.viewportHeight;
 
     map['steps'] = tc.steps.map(_stepToMap).toList();
     return map;
@@ -153,6 +164,8 @@ class StorageService {
         'assert': step.assertion,
       'timeout': step.timeoutSeconds,
       if (step.maxSubSteps != null) 'max_sub_steps': step.maxSubSteps,
+      if (step.resolvedAction != null)
+        'resolved_action': step.resolvedAction!.toJson(),
     };
   }
 

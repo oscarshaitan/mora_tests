@@ -1,5 +1,7 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 
+import 'llm_action.dart';
+
 part 'test_step.freezed.dart';
 part 'test_step.g.dart';
 
@@ -24,6 +26,9 @@ abstract class TestStep with _$TestStep {
     /// sub-test's own `variables` block, so callers can supply values like
     /// username/password without editing the sub-test file.
     @Default({}) Map<String, String> withVars,
+    /// Pre-computed action resolved during coop builder mode.
+    /// When set, the runner executes this action directly without an LLM call.
+    @Default(null) LlmAction? resolvedAction,
   }) = _TestStep;
 
   factory TestStep.fromJson(Map<String, Object?> json) =>

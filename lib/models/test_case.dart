@@ -19,6 +19,8 @@ abstract class TestCase with _$TestCase {
     HttpHook? teardown,
     @Default([]) List<TestStep> steps,
     @Default({}) Map<String, String> variables,
+    @Default(1280) int viewportWidth,
+    @Default(720) int viewportHeight,
     @Default(TestStatus.idle) TestStatus status,
     String? filePath,
   }) = _TestCase;

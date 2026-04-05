@@ -151,8 +151,15 @@ class RunView extends StatelessWidget {
         ),
         const VerticalDivider(width: 1),
         // Right: live WebView — uses the cubit's shared WebViewService instance
+        // Constrained to the test's viewport dimensions for consistent screenshots
         Expanded(
-          child: _WebViewPanel(webViewService: cubit.webViewService),
+          child: Center(
+            child: SizedBox(
+              width: state.currentTest.viewportWidth.toDouble(),
+              height: state.currentTest.viewportHeight.toDouble(),
+              child: _WebViewPanel(webViewService: cubit.webViewService),
+            ),
+          ),
         ),
       ],
     );

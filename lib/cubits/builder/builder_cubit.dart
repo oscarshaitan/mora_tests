@@ -1,3 +1,4 @@
+import 'dart:developer' as dev;
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
@@ -6,18 +7,29 @@ import 'package:path/path.dart' as p;
 import 'package:uuid/uuid.dart';
 
 import '../../injection.dart';
+import '../../models/llm_action.dart';
 import '../../models/test_case.dart';
 import '../../models/test_step.dart';
+import '../../services/llm_service.dart';
 import '../../services/maestro_translator.dart'
     show MaestroTranslator, TranslationResult;
 import '../../services/storage_service.dart';
+import '../../services/webview_service.dart';
 import 'builder_state.dart';
 
 class BuilderCubit extends Cubit<BuilderState> {
   final StorageService _storage;
+  final LlmService _llm;
   static const _uuid = Uuid();
 
-  BuilderCubit() : _storage = sl<StorageService>(), super(const BuilderState());
+  /// Own WebView instance for the builder's live preview (separate from runner).
+  final WebViewService webViewService;
+
+  BuilderCubit()
+      : _storage = sl<StorageService>(),
+        _llm = sl<LlmService>(),
+        webViewService = sl<WebViewService>(),
+        super(const BuilderState());
 
   // ── Test list ──────────────────────────────────────────────────────────────
 
@@ -43,7 +55,15 @@ class BuilderCubit extends Cubit<BuilderState> {
       selectedTest: test,
       isDirty: false,
       savedPath: test.filePath,
+      // Clear any pending coop state from previous test
+      resolvingStepId: null,
+      pendingAction: null,
+      pendingStepId: null,
     ));
+    // Auto-navigate if the WebView is ready and test has a start URL
+    if (state.webViewReady && test.startUrl.isNotEmpty) {
+      navigateToStartUrl();
+    }
   }
 
   void deleteTest(String id) {
@@ -96,6 +116,144 @@ class BuilderCubit extends Cubit<BuilderState> {
     final insertAt = newIndex > oldIndex ? newIndex - 1 : newIndex;
     steps.insert(insertAt, item);
     updateTest(test.copyWith(steps: steps));
+  }
+
+  // ── Coop builder mode ─────────────────────────────────────────────────────
+
+  /// Called when the builder's InAppWebView is created and ready.
+  void onWebViewReady() {
+    emit(state.copyWith(webViewReady: true));
+    final test = state.selectedTest;
+    if (test != null && test.startUrl.isNotEmpty) {
+      navigateToStartUrl();
+    }
+  }
+
+  /// Navigates the builder WebView to the selected test's start URL.
+  Future<void> navigateToStartUrl() async {
+    final test = state.selectedTest;
+    if (test == null || test.startUrl.isEmpty) return;
+    try {
+      await webViewService.navigate(test.startUrl);
+    } catch (e) {
+      dev.log('Builder navigate failed: $e', name: 'MoraTests');
+    }
+  }
+
+  /// Updates the viewport dimensions for the selected test.
+  void setViewport(int width, int height) {
+    final test = state.selectedTest;
+    if (test == null) return;
+    updateTest(test.copyWith(viewportWidth: width, viewportHeight: height));
+  }
+
+  /// Takes a screenshot and asks the LLM to resolve a step's instruction
+  /// into a concrete action. The result is held as [pendingAction] until the
+  /// user accepts or rejects it.
+  Future<void> resolveStep(String stepId) async {
+    final test = state.selectedTest;
+    if (test == null || !state.webViewReady) return;
+
+    final step = test.steps.firstWhere(
+      (s) => s.id == stepId,
+      orElse: () => TestStep(id: ''),
+    );
+    if (step.id.isEmpty || step.instruction.trim().isEmpty) return;
+
+    emit(state.copyWith(
+      resolvingStepId: stepId,
+      pendingAction: null,
+      pendingStepId: null,
+      errorMessage: null,
+    ));
+
+    try {
+      final screenshot = await webViewService.screenshot();
+      final instruction = _interpolate(step.instruction, test.variables);
+      final hint =
+          step.hint != null ? _interpolate(step.hint!, test.variables) : null;
+      final assertion = step.assertion != null
+          ? _interpolate(step.assertion!, test.variables)
+          : null;
+
+      final action = await _llm.interpretStep(
+        instruction: instruction,
+        screenshot: screenshot,
+        hint: hint,
+        assertion: assertion,
+      );
+
+      emit(state.copyWith(
+        resolvingStepId: null,
+        pendingAction: action,
+        pendingStepId: stepId,
+      ));
+    } catch (e) {
+      dev.log('Resolve step failed: $e', name: 'MoraTests');
+      emit(state.copyWith(
+        resolvingStepId: null,
+        errorMessage: 'AI resolution failed: ${e.toString().split('\n').first}',
+      ));
+    }
+  }
+
+  /// User accepts the pending AI action: saves it on the step and executes it
+  /// on the builder WebView to advance the page state.
+  Future<void> acceptAction() async {
+    final action = state.pendingAction;
+    final stepId = state.pendingStepId;
+    final test = state.selectedTest;
+    if (action == null || stepId == null || test == null) return;
+
+    // Save the resolved action on the step
+    final updatedSteps = test.steps.map((s) {
+      if (s.id == stepId) return s.copyWith(resolvedAction: action);
+      return s;
+    }).toList();
+    final updatedTest = test.copyWith(steps: updatedSteps);
+
+    emit(state.copyWith(
+      pendingAction: null,
+      pendingStepId: null,
+    ));
+    updateTest(updatedTest);
+
+    // Execute the action on the WebView to advance the page state
+    if (action.type != ActionType.done && action.type != ActionType.fail) {
+      try {
+        await webViewService.executeAction(action);
+      } catch (e) {
+        dev.log('Execute accepted action failed: $e', name: 'MoraTests');
+      }
+    }
+  }
+
+  /// User rejects the pending AI action.
+  void rejectAction() {
+    emit(state.copyWith(
+      pendingAction: null,
+      pendingStepId: null,
+    ));
+  }
+
+  /// Clears a previously resolved action from a step (user wants to re-resolve).
+  void clearResolvedAction(String stepId) {
+    final test = state.selectedTest;
+    if (test == null) return;
+    final updatedSteps = test.steps.map((s) {
+      if (s.id == stepId) return s.copyWith(resolvedAction: null);
+      return s;
+    }).toList();
+    updateTest(test.copyWith(steps: updatedSteps));
+  }
+
+  /// Simple variable interpolation (same logic as TestRunner).
+  String _interpolate(String text, Map<String, String> variables) {
+    var result = text;
+    for (final entry in variables.entries) {
+      result = result.replaceAll('\${${entry.key}}', entry.value);
+    }
+    return result;
   }
 
   // ── Save / Load ────────────────────────────────────────────────────────────
