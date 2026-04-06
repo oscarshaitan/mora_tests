@@ -112,12 +112,6 @@ class LlmService {
     String? assertion,
     String? previousActionName,
     String? previousError,
-    /// For explore/multi-turn steps: a log of sub-steps already executed,
-    /// newest last. E.g. ["sub-step 1: click (245,312) — Clicked Companies menu",
-    /// "sub-step 2: click (180,445) — Clicked Symterra row"].
-    /// When present the LLM understands it is mid-way through a goal and must
-    /// continue from the current screenshot state.
-    List<String>? subHistory,
   }) async {
     final screenshotB64 = base64Encode(screenshot);
 
@@ -126,18 +120,6 @@ class LlmService {
       if (hint != null && hint.isNotEmpty) 'HINT: $hint',
       if (assertion != null && assertion.isNotEmpty)
         'ASSERTION (must be true after the action): $assertion',
-      // Explore-mode history: show what has already been done so the LLM
-      // knows where to continue from.
-      if (subHistory != null && subHistory.isNotEmpty) ...[
-        'EXPLORE MODE — sub-steps already SUCCESSFULLY executed (most recent last):',
-        ...subHistory.map((h) => '  • $h'),
-        'IMPORTANT: Every sub-step listed above was fully executed and succeeded. '
-            'Trust the history even when the screenshot looks unchanged '
-            '(e.g. password fields show only dots after typing, canvas apps '
-            'may not visually update immediately). '
-            'Do NOT repeat any action already listed above. '
-            'If the overall goal is now achieved, return action "done".',
-      ],
       if (previousActionName != null)
         'PREVIOUS ATTEMPT: tried action "$previousActionName"',
       if (previousError != null) 'PREVIOUS ERROR: $previousError',

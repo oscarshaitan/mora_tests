@@ -39,6 +39,9 @@ class TestRunner {
 
   /// Runs a [TestCase] and emits [StepResult]s via [onStepResult].
   /// Returns the completed [TestRun].
+  ///
+  /// [onStepActionUpdated] is called when the LLM fallback resolves a new
+  /// action for a pre-computed step, so the caller can persist the update.
   Future<TestRun> run({
     required TestCase testCase,
     required void Function(StepResult) onStepResult,
@@ -48,6 +51,7 @@ class TestRunner {
       int totalSubSteps,
       StepResult? completedSubStep,
     )? onSubTestProgress,
+    void Function(String stepId, LlmAction newAction)? onStepActionUpdated,
     bool stopOnFirstFailure = true,
   }) async {
     _aborted = false;
@@ -103,6 +107,8 @@ class TestRunner {
           totalSteps: totalSteps,
           variables: testCase.variables,
           onSubTestProgress: onSubTestProgress,
+          llmFallbackOnFail: testCase.llmFallbackOnFail,
+          onStepActionUpdated: onStepActionUpdated,
         );
 
         onStepResult(result);
@@ -165,6 +171,8 @@ class TestRunner {
     required int stepNumber,
     required int totalSteps,
     void Function(TestCase, int, int, StepResult?)? onSubTestProgress,
+    bool llmFallbackOnFail = false,
+    void Function(String stepId, LlmAction newAction)? onStepActionUpdated,
   }) async {
     // Call steps run a referenced YAML file inline.
     if (step.call != null) {
@@ -177,13 +185,15 @@ class TestRunner {
       );
     }
 
-    // Explore steps have their own multi-turn loop.
-    if (step.maxSubSteps != null) {
-      return _runExploreStep(
+    // Pre-computed action from coop builder mode — skip LLM entirely.
+    if (step.resolvedAction != null) {
+      return _runPrecomputedStep(
         step: step,
         variables: variables,
         stepNumber: stepNumber,
         totalSteps: totalSteps,
+        llmFallbackOnFail: llmFallbackOnFail,
+        onStepActionUpdated: onStepActionUpdated,
       );
     }
 
@@ -393,161 +403,234 @@ class TestRunner {
     );
   }
 
+  /// Runs a step using its pre-computed [resolvedAction] from the coop builder.
+  ///
+  /// Retries up to 3 times with 1 s delay between attempts. If all retries
+  /// fail and [llmFallbackOnFail] is true, falls back to the LLM to resolve
+  /// the step live. When the LLM succeeds, [onStepActionUpdated] is called
+  /// so the caller can persist the new action for future runs.
+  Future<StepResult> _runPrecomputedStep({
+    required TestStep step,
+    required Map<String, String> variables,
+    required int stepNumber,
+    required int totalSteps,
+    bool llmFallbackOnFail = false,
+    void Function(String stepId, LlmAction newAction)? onStepActionUpdated,
+  }) async {
+    final stopwatch = Stopwatch()..start();
+    final action = step.resolvedAction!;
+
+    dev.log('─' * 56, name: 'MoraTests');
+    dev.log(
+      'Step $stepNumber/$totalSteps [Precomputed]: ${step.instruction}',
+      name: 'MoraTests',
+    );
+
+    final screenshotBefore = await _safeScreenshot() ?? _emptyPng();
+
+    if (action.type == ActionType.done) {
+      return StepResult(
+        stepId: step.id,
+        success: true,
+        actionTaken: action,
+        screenshotBefore: screenshotBefore,
+        screenshotAfter: screenshotBefore,
+        rawLlmResponse: 'Precomputed: done',
+        duration: stopwatch.elapsed,
+        executedAt: DateTime.now(),
+      );
+    }
+
+    if (action.type == ActionType.fail) {
+      return StepResult(
+        stepId: step.id,
+        success: false,
+        actionTaken: action,
+        screenshotBefore: screenshotBefore,
+        screenshotAfter: screenshotBefore,
+        errorMessage: 'Precomputed: ${action.reasoning}',
+        rawLlmResponse: action.reasoning,
+        duration: stopwatch.elapsed,
+        executedAt: DateTime.now(),
+      );
+    }
+
+    // ── Retry loop: 3 attempts with 1 s delay ──────────────────────────────
+    const maxAttempts = 3;
+    String? lastError;
+
+    for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        dev.log(
+          '  Attempt $attempt/$maxAttempts: ${_formatActionLog(action)}',
+          name: 'MoraTests',
+        );
+        await webViewService.executeAction(action);
+        await Future.delayed(
+          const Duration(milliseconds: AppConstants.postActionDelayMs),
+        );
+
+        final screenshotAfter = await _safeScreenshot();
+        dev.log(
+          'PASS (precomputed, attempt $attempt, ${_formatDuration(stopwatch.elapsed)})',
+          name: 'MoraTests',
+        );
+
+        return StepResult(
+          stepId: step.id,
+          success: true,
+          actionTaken: action,
+          screenshotBefore: screenshotBefore,
+          screenshotAfter: screenshotAfter,
+          rawLlmResponse: 'Precomputed action executed successfully',
+          duration: stopwatch.elapsed,
+          executedAt: DateTime.now(),
+        );
+      } catch (e) {
+        lastError = e.toString();
+        final brief = lastError.split('\n').first;
+        dev.log(
+          '  Attempt $attempt/$maxAttempts failed: $brief',
+          name: 'MoraTests',
+        );
+        if (attempt < maxAttempts) {
+          await Future.delayed(const Duration(seconds: 1));
+        }
+      }
+    }
+
+    // ── All retries exhausted — optionally fall back to LLM ─────────────────
+    if (llmFallbackOnFail) {
+      dev.log(
+        '  Precomputed retries exhausted — falling back to LLM',
+        name: 'MoraTests',
+      );
+      try {
+        final screenshot = await webViewService.screenshot();
+        final instruction = _interpolate(step.instruction, variables);
+        final hint =
+            step.hint != null ? _interpolate(step.hint!, variables) : null;
+        final assertion = step.assertion != null
+            ? _interpolate(step.assertion!, variables)
+            : null;
+
+        final llmAction = await llmService.interpretStep(
+          instruction: instruction,
+          screenshot: screenshot,
+          hint: hint,
+          assertion: assertion,
+          previousActionName: action.type.name,
+          previousError: lastError,
+        ).timeout(
+          Duration(seconds: step.timeoutSeconds),
+          onTimeout: () => throw TimeoutException(
+            'LLM fallback timed out after ${step.timeoutSeconds}s',
+          ),
+        );
+
+        final conf = '${(llmAction.confidence * 100).toStringAsFixed(0)}%';
+        dev.log(
+          '  LLM fallback: ${llmAction.type.name} ($conf)',
+          name: 'MoraTests',
+        );
+
+        if (llmAction.type == ActionType.done) {
+          onStepActionUpdated?.call(step.id, llmAction);
+          final after = await _safeScreenshot();
+          return StepResult(
+            stepId: step.id,
+            success: true,
+            actionTaken: llmAction,
+            screenshotBefore: screenshot,
+            screenshotAfter: after,
+            rawLlmResponse: llmAction.reasoning,
+            duration: stopwatch.elapsed,
+            executedAt: DateTime.now(),
+          );
+        }
+
+        if (llmAction.type == ActionType.fail) {
+          final after = await _safeScreenshot();
+          return StepResult(
+            stepId: step.id,
+            success: false,
+            actionTaken: llmAction,
+            screenshotBefore: screenshot,
+            screenshotAfter: after,
+            errorMessage: 'LLM fallback reported failure: ${llmAction.reasoning}',
+            rawLlmResponse: llmAction.reasoning,
+            duration: stopwatch.elapsed,
+            executedAt: DateTime.now(),
+          );
+        }
+
+        // Execute the LLM-resolved action
+        dev.log('  ${_formatActionLog(llmAction)}', name: 'MoraTests');
+        await webViewService.executeAction(llmAction);
+        await Future.delayed(
+          const Duration(milliseconds: AppConstants.postActionDelayMs),
+        );
+
+        // Notify caller to persist the new action
+        onStepActionUpdated?.call(step.id, llmAction);
+
+        final screenshotAfter = await _safeScreenshot();
+        dev.log(
+          'PASS (LLM fallback, ${_formatDuration(stopwatch.elapsed)})',
+          name: 'MoraTests',
+        );
+
+        return StepResult(
+          stepId: step.id,
+          success: true,
+          actionTaken: llmAction,
+          screenshotBefore: screenshot,
+          screenshotAfter: screenshotAfter,
+          rawLlmResponse: 'LLM fallback resolved and updated saved action',
+          duration: stopwatch.elapsed,
+          executedAt: DateTime.now(),
+        );
+      } catch (llmError) {
+        dev.log(
+          '  LLM fallback also failed: $llmError',
+          name: 'MoraTests',
+        );
+        final fallback = await _safeScreenshot();
+        return StepResult(
+          stepId: step.id,
+          success: false,
+          actionTaken: action,
+          screenshotBefore: screenshotBefore,
+          screenshotAfter: fallback,
+          errorMessage:
+              'Precomputed failed ($maxAttempts retries) and LLM fallback failed: $llmError',
+          duration: stopwatch.elapsed,
+          executedAt: DateTime.now(),
+        );
+      }
+    }
+
+    // No LLM fallback — return failure
+    final fallback = await _safeScreenshot();
+    return StepResult(
+      stepId: step.id,
+      success: false,
+      actionTaken: action,
+      screenshotBefore: screenshotBefore,
+      screenshotAfter: fallback,
+      errorMessage:
+          'Precomputed action failed after $maxAttempts retries: $lastError',
+      duration: stopwatch.elapsed,
+      executedAt: DateTime.now(),
+    );
+  }
+
   /// Interpolates all values in [map] using [variables].
   Map<String, String> _interpolateMap(
       Map<String, String> map, Map<String, String> variables) {
     return {
       for (final e in map.entries) e.key: _interpolate(e.value, variables),
     };
-  }
-
-  /// Runs a step in explore / multi-turn mode.
-  ///
-  /// The LLM is called up to [step.maxSubSteps] times. Each call receives the
-  /// current screenshot PLUS the growing history of sub-steps already taken,
-  /// so it always knows where it is and what still needs to happen.
-  ///
-  ///  • LLM returns `done`  → step succeeds (goal reached).
-  ///  • LLM returns `fail`  → step fails immediately.
-  ///  • All sub-steps used without `done` → step fails with a timeout message.
-  Future<StepResult> _runExploreStep({
-    required TestStep step,
-    required Map<String, String> variables,
-    required int stepNumber,
-    required int totalSteps,
-  }) async {
-    final stopwatch = Stopwatch()..start();
-    final instruction = _interpolate(step.instruction, variables);
-    final hint = step.hint != null ? _interpolate(step.hint!, variables) : null;
-    final assertion =
-        step.assertion != null ? _interpolate(step.assertion!, variables) : null;
-    final maxSubSteps = step.maxSubSteps!;
-
-    dev.log('─' * 56, name: 'MoraTests');
-    dev.log('Step $stepNumber/$totalSteps [Explore, $maxSubSteps sub-steps max]: $instruction',
-        name: 'MoraTests');
-
-    // Capped history: we keep the last 6 entries to bound token usage while
-    // still giving the LLM enough context to avoid re-doing completed steps.
-    final history = <String>[];
-    Uint8List? firstScreenshot;
-
-    for (int sub = 1; sub <= maxSubSteps; sub++) {
-      if (_aborted) break;
-
-      try {
-        final screenshot = await webViewService.screenshot();
-        firstScreenshot ??= screenshot;
-
-        dev.log('  [$sub/$maxSubSteps]', name: 'MoraTests');
-
-        final recentHistory = history.length > AppConstants.exploreHistorySize
-            ? history.sublist(history.length - AppConstants.exploreHistorySize)
-            : history;
-
-        final action = await llmService.interpretStep(
-          instruction: instruction,
-          screenshot: screenshot,
-          hint: hint,
-          assertion: assertion,
-          subHistory: recentHistory.isEmpty ? null : recentHistory,
-        ).timeout(
-          Duration(seconds: step.timeoutSeconds),
-          onTimeout: () => throw TimeoutException(
-            'Sub-step timed out after ${step.timeoutSeconds}s',
-          ),
-        );
-
-        final conf = '${(action.confidence * 100).toStringAsFixed(0)}%';
-        dev.log('  LLM: ${_shortenReasoning(action.reasoning)} ($conf)',
-            name: 'MoraTests');
-
-        // Goal reached ✓
-        if (action.type == ActionType.done) {
-          final after = await _safeScreenshot();
-          return StepResult(
-            stepId: step.id,
-            success: true,
-            actionTaken: action,
-            screenshotBefore: firstScreenshot,
-            screenshotAfter: after,
-            rawLlmResponse: action.reasoning,
-            duration: stopwatch.elapsed,
-            executedAt: DateTime.now(),
-          );
-        }
-
-        // LLM gave up ✗
-        if (action.type == ActionType.fail) {
-          final after = await _safeScreenshot();
-          return StepResult(
-            stepId: step.id,
-            success: false,
-            actionTaken: action,
-            screenshotBefore: screenshot,
-            screenshotAfter: after,
-            errorMessage: 'Explore: LLM reported failure: ${action.reasoning}',
-            rawLlmResponse: action.reasoning,
-            duration: stopwatch.elapsed,
-            executedAt: DateTime.now(),
-          );
-        }
-
-        // Repeat-type guard ✓
-        // If the LLM proposes typing the same value that already appears in
-        // history, the value was already entered — stop immediately.
-        // This handles password fields (dots give no visual confirmation) and
-        // similar "invisible" inputs. Clicks are excluded: a repeated click
-        // means the element didn't respond and the LLM should keep trying.
-        if (_isRepeatAction(action, history)) {
-          dev.log(
-            '  Repeat action detected — goal achieved',
-            name: 'MoraTests',
-          );
-          final after = await _safeScreenshot();
-          return StepResult(
-            stepId: step.id,
-            success: true,
-            actionTaken: action,
-            screenshotBefore: firstScreenshot,
-            screenshotAfter: after,
-            rawLlmResponse: 'Goal achieved (repeat-action guard)',
-            duration: stopwatch.elapsed,
-            executedAt: DateTime.now(),
-          );
-        }
-
-        // Execute the sub-action
-        dev.log('  ${_formatActionLog(action)}', name: 'MoraTests');
-        await webViewService.executeAction(action);
-        await Future.delayed(
-          const Duration(milliseconds: AppConstants.settleDelayMs),
-        );
-
-        // Record in history using factual past-tense language.
-        // Deliberately NOT using action.reasoning (which is forward-looking:
-        // "I should type…") — past-tense facts help the LLM correctly read
-        // the history as "already done" rather than "about to do".
-        history.add(_historyEntry(sub, action));
-      } catch (e) {
-        // Sub-step errors are non-fatal; log and let the loop continue.
-        final brief = e.toString().split('\n').first.split(': {').first;
-        dev.log('  [$sub/$maxSubSteps] error: $brief', name: 'MoraTests');
-      }
-    }
-
-    // Ran out of sub-steps without reaching done
-    final fallback = await _safeScreenshot();
-    return StepResult(
-      stepId: step.id,
-      success: false,
-      screenshotBefore: firstScreenshot ?? fallback ?? _emptyPng(),
-      screenshotAfter: fallback,
-      errorMessage:
-          'Explore: goal not reached after $maxSubSteps sub-steps',
-      duration: stopwatch.elapsed,
-      executedAt: DateTime.now(),
-    );
   }
 
   String _formatDuration(Duration d) {
@@ -602,57 +685,6 @@ class TestRunner {
     } catch (_) {
       return null;
     }
-  }
-
-  /// Returns a factual, past-tense history entry for a completed sub-action.
-  ///
-  /// Past tense ensures the LLM reads history entries as "already done"
-  /// rather than "about to do", which prevents repeated actions.
-  String _historyEntry(int sub, LlmAction action) {
-    final at = (action.x != null && action.y != null)
-        ? ' at (${action.x!.toStringAsFixed(0)},${action.y!.toStringAsFixed(0)})'
-        : '';
-    switch (action.type) {
-      case ActionType.type:
-        return '[DONE] sub-step $sub: typed "${action.value}" into the focused field.';
-      case ActionType.click:
-        return '[DONE] sub-step $sub: clicked$at.';
-      case ActionType.doubleClick:
-        return '[DONE] sub-step $sub: double-clicked$at.';
-      case ActionType.longPress:
-        return '[DONE] sub-step $sub: long-pressed$at.';
-      case ActionType.scroll:
-        return '[DONE] sub-step $sub: scrolled (delta_y=${action.scrollDeltaY}).';
-      case ActionType.navigate:
-        return '[DONE] sub-step $sub: navigated to ${action.url}.';
-      case ActionType.pressKey:
-        return '[DONE] sub-step $sub: pressed key "${action.key}".';
-      case ActionType.hover:
-        return '[DONE] sub-step $sub: hovered$at.';
-      case ActionType.wait:
-        return '[DONE] sub-step $sub: waited ${action.waitMs ?? 0} ms.';
-      default:
-        final val = action.value != null ? ' "${action.value}"' : '';
-        return '[DONE] sub-step $sub: ${action.type.name}$at$val.';
-    }
-  }
-
-  /// Returns true if [action] is a repeat of something already in [history].
-  ///
-  /// Only `type` with the same value is treated as a repeat — this covers the
-  /// common case where the LLM re-types a password after it was already entered
-  /// (password fields show only dots, so the LLM cannot visually confirm the
-  /// text was accepted).
-  ///
-  /// Clicks are intentionally NOT flagged as repeats: a repeated click usually
-  /// means the previous tap was not registered by a Flutter/canvas widget and
-  /// the LLM is correctly retrying — treating it as "done" would cause the step
-  /// to succeed before the actual goal is reached (e.g. before a form is filled
-  /// and submitted).
-  bool _isRepeatAction(LlmAction action, List<String> history) {
-    if (history.isEmpty) return false;
-    if (action.type != ActionType.type || action.value == null) return false;
-    return history.any((entry) => entry.contains('typed "${action.value}"'));
   }
 
   // 1x1 transparent PNG as fallback when screenshot fails

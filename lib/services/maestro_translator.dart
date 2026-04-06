@@ -328,7 +328,7 @@ class MaestroTranslator {
       }
 
       // runFlow with when + commands → conditional block:
-      //   step 1: explore step that waits for the condition
+      //   step 1: wait step that checks the condition
       //   step 2+: the commands inside the block
       if (name == 'runFlow' && value is YamlMap &&
           value.containsKey('when') && value.containsKey('commands')) {
@@ -345,7 +345,6 @@ class MaestroTranslator {
               id: _uuid.v4(),
               instruction: 'Wait until "$label" is visible',
               assertion: '"$label" should be visible',
-              maxSubSteps: 5,
               timeoutSeconds: 30,
             ));
           } else if (notVisible != null) {
@@ -354,7 +353,6 @@ class MaestroTranslator {
               id: _uuid.v4(),
               instruction: 'Wait until "$label" is not visible',
               assertion: '"$label" should not be visible',
-              maxSubSteps: 5,
               timeoutSeconds: 30,
             ));
           }

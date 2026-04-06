@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 
 import '../../cubits/builder/builder_cubit.dart';
 import '../../cubits/builder/builder_state.dart';
 import '../../models/test_case.dart';
+import '../../services/webview_service.dart';
+import '../../widgets/action_overlay.dart';
 import 'test_form.dart';
 
 class BuilderScreen extends StatelessWidget {
@@ -21,11 +24,20 @@ class BuilderScreen extends StatelessWidget {
               child: _TestList(state: state),
             ),
             const VerticalDivider(width: 1),
-            // Right: Editor
+            // Center: Editor
             Expanded(
+              flex: 2,
               child: state.selectedTest != null
                   ? TestForm(test: state.selectedTest!)
                   : const _EmptyEditor(),
+            ),
+            const VerticalDivider(width: 1),
+            // Right: Live WebView preview
+            Expanded(
+              flex: 3,
+              child: state.selectedTest != null
+                  ? _BuilderWebViewPanel(test: state.selectedTest!)
+                  : const _EmptyWebView(),
             ),
           ],
         );
@@ -190,7 +202,7 @@ class _TestList extends StatelessWidget {
           child: ListView.separated(
             shrinkWrap: true,
             itemCount: issues.length,
-            separatorBuilder: (_, _) => const Divider(height: 1),
+            separatorBuilder: (_, __) => const Divider(height: 1),
             itemBuilder: (_, i) => Padding(
               padding: const EdgeInsets.symmetric(vertical: 8),
               child: Text(issues[i].trim(),
@@ -235,6 +247,124 @@ class _TestList extends StatelessWidget {
 
 enum _ImportOption { file, folder }
 
+// ── Builder WebView panel ────────────────────────────────────────────────────
+
+class _BuilderWebViewPanel extends StatelessWidget {
+  final TestCase test;
+  const _BuilderWebViewPanel({required this.test});
+
+  @override
+  Widget build(BuildContext context) {
+    final cubit = context.read<BuilderCubit>();
+    final cs = Theme.of(context).colorScheme;
+
+    return Column(
+      children: [
+        // Toolbar with viewport info and navigate button
+        Container(
+          height: 40,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: cs.surfaceContainerLow,
+            border: Border(bottom: BorderSide(color: cs.outlineVariant)),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.web, size: 16, color: cs.onSurfaceVariant),
+              const SizedBox(width: 6),
+              Text(
+                '${test.viewportWidth} x ${test.viewportHeight}',
+                style: Theme.of(context)
+                    .textTheme
+                    .labelSmall
+                    ?.copyWith(color: cs.onSurfaceVariant),
+              ),
+              const Spacer(),
+              TextButton.icon(
+                onPressed: cubit.navigateToStartUrl,
+                icon: const Icon(Icons.refresh, size: 14),
+                label: const Text('Navigate'),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  visualDensity: VisualDensity.compact,
+                ),
+              ),
+            ],
+          ),
+        ),
+        // WebView constrained to viewport dimensions, with action overlay
+        Expanded(
+          child: Center(
+            child: Container(
+              width: test.viewportWidth.toDouble(),
+              height: test.viewportHeight.toDouble(),
+              decoration: BoxDecoration(
+                border: Border.all(color: cs.outlineVariant),
+              ),
+              child: BlocBuilder<BuilderCubit, BuilderState>(
+                buildWhen: (prev, curr) =>
+                    prev.pendingAction != curr.pendingAction,
+                builder: (context, state) {
+                  return Stack(
+                    children: [
+                      _BuilderInAppWebView(
+                        webViewService: cubit.webViewService,
+                        onReady: cubit.onWebViewReady,
+                      ),
+                      if (state.pendingAction != null)
+                        Positioned.fill(
+                          child: IgnorePointer(
+                            child: ActionOverlay(
+                              action: state.pendingAction!,
+                              dpr: cubit.webViewService.dpr,
+                            ),
+                          ),
+                        ),
+                    ],
+                  );
+                },
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _BuilderInAppWebView extends StatelessWidget {
+  final WebViewService webViewService;
+  final VoidCallback onReady;
+
+  const _BuilderInAppWebView({
+    required this.webViewService,
+    required this.onReady,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InAppWebView(
+      initialSettings: InAppWebViewSettings(
+        javaScriptEnabled: true,
+        domStorageEnabled: true,
+        useHybridComposition: true,
+      ),
+      onWebViewCreated: (controller) {
+        webViewService.attach(controller);
+        onReady();
+      },
+      onLoadStop: (controller, url) {
+        webViewService.notifyLoadStop();
+      },
+      onReceivedError: (controller, request, error) {
+        webViewService.notifyLoadStop();
+      },
+    );
+  }
+}
+
+// ── Empty states ─────────────────────────────────────────────────────────────
+
 class _EmptyEditor extends StatelessWidget {
   const _EmptyEditor();
 
@@ -253,6 +383,33 @@ class _EmptyEditor extends StatelessWidget {
             style: TextStyle(
               color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EmptyWebView extends StatelessWidget {
+  const _EmptyWebView();
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.web_outlined, size: 56, color: cs.outlineVariant),
+          const SizedBox(height: 12),
+          Text(
+            'Live preview will appear here',
+            style: TextStyle(fontSize: 14, color: cs.onSurfaceVariant),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Select a test to start the browser',
+            style: TextStyle(fontSize: 12, color: cs.outlineVariant),
           ),
         ],
       ),

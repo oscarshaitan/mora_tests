@@ -6,7 +6,7 @@
 
 An AI-powered UI test runner built with Flutter Desktop (Windows + macOS).
 
-Tests are described in natural language YAML files. For each step the app takes a screenshot of an embedded WebView, sends it to a vision-capable LLM (**OVH AI Endpoints** or **Vertex AI**), and executes the LLM's returned action via **CDP (Chrome DevTools Protocol)** events and JavaScript injection.
+Tests are described in natural language YAML files. The **coop builder mode** lets you author tests interactively: for each step the AI suggests an action on a live WebView, you validate it, and the validated action is saved with the test. At runtime the **runner replays saved actions without any LLM calls**, making repeated runs essentially free. Steps that don't yet have a saved action fall back to the original vision-LLM pipeline (screenshot + instruction -> action via **OVH AI Endpoints** or **Vertex AI**).
 
 ---
 
@@ -17,7 +17,7 @@ Tests are described in natural language YAML files. For each step the app takes 
 - [Configuration](#configuration)
 - [YAML Test Format](#yaml-test-format)
 - [Step Types](#step-types)
-- [Explore Mode](#explore-mode)
+- [Coop Builder Mode](#coop-builder-mode)
 - [Sub-test Calls](#sub-test-calls)
 - [How It Works](#how-it-works)
 - [Architecture](#architecture)
@@ -190,6 +190,9 @@ id: "uuid"
 name: "Login Flow Test"
 description: "Verifies login and dashboard access"
 start_url: "https://myapp.com/login"
+viewport_width: 1280
+viewport_height: 720
+llm_fallback_on_fail: false    # set true to auto-resolve failing pre-computed steps via LLM
 
 # Optional: called before the test runs
 seeder:
@@ -227,12 +230,6 @@ steps:
     hint: "Look for a blue button at the bottom of the form that says 'Sign In' or 'Login'"
     timeout: 20
 
-  # Explore step — LLM loops up to max_sub_steps times until it returns "done"
-  - id: "step-004"
-    instruction: "Navigate to the Companies section and open the Symterra account"
-    max_sub_steps: 8
-    timeout: 60
-
   # Standard step with assertion
   - id: "step-005"
     instruction: "Verify the dashboard loaded successfully"
@@ -258,6 +255,9 @@ steps:
 | `seeder` | No | HTTP call made before the test runs |
 | `teardown` | No | HTTP call made after the test finishes (always, even on failure) |
 | `variables` | No | Key-value pairs; use `${key}` in instructions |
+| `viewport_width` | No | WebView width in pixels (default: 1280). Must match between builder and runner for pre-computed actions to work |
+| `viewport_height` | No | WebView height in pixels (default: 720) |
+| `llm_fallback_on_fail` | No | When `true`, if a pre-computed action fails after 3 retries the runner asks the LLM to re-resolve the step and saves the new action (default: `false`) |
 
 ### Step fields
 
@@ -267,9 +267,9 @@ steps:
 | `hint` | No | Extra guidance for the LLM (e.g. visual description, CSS selector hints) |
 | `assert` | No | Assertion the LLM should verify after acting |
 | `timeout` | No | Seconds to wait per LLM call (default: 30) |
-| `max_sub_steps` | No | Enables **Explore mode** — LLM loops up to this many times to reach the goal |
 | `call` | No | Path to another YAML file to run inline as a sub-test (relative to this file) |
 | `with` | No | Variable overrides passed into the sub-test (used with `call`) |
+| `resolved_action` | No | Pre-computed `LlmAction` saved by the coop builder. When present, the runner executes it directly without an LLM call |
 
 ### Seeder / Teardown HTTP hook fields
 
@@ -322,17 +322,6 @@ After the action, the LLM also checks a condition. If the assertion fails, the s
   timeout: 20
 ```
 
-### Explore step
-
-Multi-turn: the LLM receives the current screenshot plus a log of sub-steps already taken, and loops until it signals `done` or the sub-step budget is exhausted. Use for navigating menus, filling multi-page forms, or any flow where the exact number of clicks is unpredictable.
-
-```yaml
-- id: "step-003"
-  instruction: "Navigate to Settings > Notifications and enable email alerts"
-  max_sub_steps: 10
-  timeout: 30
-```
-
 ### Call step
 
 Runs another YAML file inline as a sub-test. Useful for reusing a login sequence across many tests.
@@ -347,20 +336,45 @@ Runs another YAML file inline as a sub-test. Useful for reusing a login sequence
 
 ---
 
-## Explore Mode
+## Coop Builder Mode
 
-When a step has `max_sub_steps` set, the runner enters a multi-turn loop:
+The builder tab provides a **three-panel layout**: test list, form editor, and a live WebView preview. This enables a cooperative workflow where you and the AI resolve each step together at authoring time, so the runner can replay saved actions without any LLM calls.
 
-1. Take a screenshot of the current state
-2. Call the LLM with the instruction **plus the full history** of actions already taken
-3. Execute the returned action and record it as a factual, past-tense history entry
-4. Repeat until the LLM returns `done` (success), `fail` (failure), or the sub-step budget is exhausted
+### Workflow
 
-Use explore mode for multi-step flows where the exact number of actions is not known in advance — navigating through menus, filling multi-page forms, or completing any workflow that requires the LLM to reason about intermediate state.
+1. **Create or open a test** in the builder. The WebView navigates to the test's `start_url`.
+2. **Write a step instruction** (e.g. "Click the login button").
+3. **Click "Ask AI"** on the step card. The builder takes a screenshot and sends it with the instruction to the LLM.
+4. The AI returns a suggested action (e.g. `click at (245, 312)`) displayed in a preview card with confidence and reasoning. A **visual overlay** appears on the live WebView showing exactly where/what the action targets:
+   - **click / doubleClick / longPress / hover** — animated crosshair at the target coordinates
+   - **type / selectOption** — crosshair + floating text bubble with the value to be entered
+   - **scroll** — directional arrow with pixel delta
+   - **navigate** — top banner with the target URL
+   - **pressKey** — centered key cap (e.g. `[Enter]`)
+   - **assert_*** — bottom banner with the assertion text
+   - **done / fail** — centered green checkmark or red X
+5. **Accept** the action: it is saved as `resolved_action` on the step and executed on the WebView to advance the page state. **Reject** to discard and try again.
+6. **Save the test**. The YAML file now contains the pre-computed action for each resolved step.
 
-**History capping:** the last 6 sub-step history entries are sent to the LLM to bound token usage while still providing enough context.
+### Viewport locking
 
-**Repeat-type guard:** if the LLM proposes typing the same value that already appears in history, the step immediately succeeds. This handles password fields (which show only dots after typing) and other inputs where visual confirmation is unavailable.
+Since pre-computed actions use pixel coordinates from the screenshot, the **viewport dimensions must match** between the builder and the runner. Each test specifies `viewport_width` and `viewport_height` (default 1280x720). The builder and runner both constrain the WebView to these dimensions. Common presets (1920x1080, 1024x768, mobile, tablet) are available in the viewport editor.
+
+### Runner behaviour with pre-computed actions
+
+When a step has a `resolved_action`, the runner:
+
+1. **Tries the saved action up to 3 times** with a 1-second delay between retries.
+2. If all retries fail and `llm_fallback_on_fail` is **enabled** on the test:
+   - Takes a fresh screenshot, calls the LLM to re-resolve the step.
+   - If the LLM succeeds, the new action is executed **and saved back** to the YAML file for future runs.
+3. If `llm_fallback_on_fail` is **disabled** (default), the step fails after 3 retries.
+
+Steps without a `resolved_action` (e.g. call steps or steps not yet resolved) use the original LLM pipeline.
+
+### Limitations (v1)
+
+- **Call steps** reference external YAML files and are excluded from coop resolution.
 
 ---
 
@@ -406,20 +420,27 @@ The call step counts as a single step in the results view: it passes if all sub-
 
 ```
 For each test step:
-  1. Take WebView screenshot (PNG)
-  2. Send screenshot + instruction + hint → active LLM provider (OVH or Vertex AI)
-  3. LLM returns JSON: { "action": "click", "x": 378, "y": 400, ... }
-  4. Execute action:
-       - click / doubleClick / longPress → JS PointerEvent sequence (synchronous,
-         avoids OS-focus issues with embedded WebView2)
-       - type  → CDP Input.insertText (after click-to-focus + field clear)
-       - pressKey → CDP Input.dispatchKeyEvent
-       - scroll → CDP mouseWheel + JS window.scrollBy (belt-and-suspenders)
-       - assert_* → JavaScript (returns true/false)
-       - call  → load sub-test YAML, merge variables, run steps inline
-  5. Wait for page to settle, take "after" screenshot
-  6. On failure: retry up to 2× with error context fed back to the LLM
-     If primary model fails, retry once with the fallback model
+
+  A. Pre-computed action exists (resolved_action in YAML):
+     1. Execute the saved action directly (no LLM call)
+     2. Retry up to 3× with 1 s delay on failure
+     3. If llm_fallback_on_fail is enabled and all retries fail:
+        take a screenshot, ask LLM, execute, save updated action
+
+  B. No pre-computed action (standard LLM pipeline):
+     1. Take WebView screenshot (PNG)
+     2. Send screenshot + instruction + hint → active LLM provider (OVH or Vertex AI)
+     3. LLM returns JSON: { "action": "click", "x": 378, "y": 400, ... }
+     4. Execute action:
+          - click / doubleClick / longPress → JS PointerEvent sequence
+          - type  → CDP Input.insertText (after click-to-focus + field clear)
+          - pressKey → CDP Input.dispatchKeyEvent
+          - scroll → CDP mouseWheel + JS window.scrollBy
+          - assert_* → JavaScript (returns true/false)
+          - call  → load sub-test YAML, merge variables, run steps inline
+     5. Wait for page to settle, take "after" screenshot
+     6. On failure: retry up to 2× with error context fed back to the LLM
+        If primary model fails, retry once with the fallback model
 ```
 
 **Supported actions:** `click`, `doubleClick`, `longPress`, `type`, `scroll`, `navigate`, `wait`, `hover`, `pressKey`, `selectOption`, `assert_text`, `assert_url`, `assert_visible`, `done`, `fail`
@@ -440,36 +461,38 @@ This guarantees every test starts from a logged-out baseline regardless of what 
 ## Architecture
 
 ```
-YAML File
-    │
-    ▼
-StorageService.loadTestCase()       — parses YAML into TestCase model
-    │
-    ▼
-TestRunner.run()
-    ├─ httpHookService.call(seeder)  — optional pre-test HTTP call
-    │
-    ├─ For each step:
-    │   ├─ Standard step
-    │   │   ├─ webViewService.screenshot()
-    │   │   ├─ llmService.interpretStep()  — vision LLM API call
-    │   │   └─ webViewService.executeAction()
-    │   │
-    │   ├─ Explore step (max_sub_steps set)
-    │   │   └─ Loops with growing history until LLM returns "done"
-    │   │
-    │   └─ Call step (call: path/to/sub.yaml)
-    │       └─ Loads sub-test, merges variables, runs inline
-    │
-    └─ httpHookService.call(teardown)  — optional post-test HTTP call
-         webViewService.navigate(clean: true)  — wipe browser state
+                        YAML File
+                            │
+                            ▼
+            StorageService.loadTestCase()       — parses YAML into TestCase model
+                            │
+          ┌─────────────────┴─────────────────┐
+          ▼                                   ▼
+  Coop Builder Mode                    TestRunner.run()
+  ├─ Live WebView preview              ├─ httpHookService.call(seeder)
+  ├─ For each step:                    │
+  │   ├─ User writes instruction       ├─ For each step:
+  │   ├─ "Ask AI" → screenshot         │   ├─ Pre-computed step (resolved_action set)
+  │   │   + LLM call                   │   │   ├─ Execute saved action (3 retries)
+  │   ├─ Accept → save action          │   │   └─ Optional LLM fallback on failure
+  │   │   + execute on WebView         │   │
+  │   └─ Reject → discard             │   ├─ Standard step (no resolved_action)
+  │                                    │   │   ├─ webViewService.screenshot()
+  └─ Save test with                    │   │   ├─ llmService.interpretStep()
+     resolved_action per step          │   │   └─ webViewService.executeAction()
+                                       │   │
+                                       │   └─ Call step (call: path/to/sub.yaml)
+                                       │       └─ Loads sub-test, merges variables, runs inline
+                                       │
+                                       └─ httpHookService.call(teardown)
+                                            webViewService.navigate(clean: true)
 ```
 
 ### Key components
 
 | Component | File | Responsibility |
 |-----------|------|----------------|
-| `TestRunner` | `lib/services/test_runner.dart` | Orchestrates step execution, explore loops, call steps |
+| `TestRunner` | `lib/services/test_runner.dart` | Orchestrates step execution, pre-computed actions, call steps |
 | `LlmService` | `lib/services/llm_service.dart` | OpenAI-compatible vision API; fallback model; rate-limit retry |
 | `WebViewService` | `lib/services/webview_service.dart` | CDP + JS action dispatch; screenshot; session cleanup |
 | `JsBuilder` | `lib/services/js_builder.dart` | Generates JavaScript strings for each action type |
@@ -523,8 +546,8 @@ lib/
 │   ├── constants.dart          # LlmProvider enum, default URLs and model names
 │   └── exceptions.dart         # StorageException, LlmException, HookException
 ├── models/                     # freezed data models
-│   ├── test_case.dart          # id, name, startUrl, seeder, teardown, steps, variables
-│   ├── test_step.dart          # instruction, hint, assert, timeout, maxSubSteps, call, withVars
+│   ├── test_case.dart          # id, name, startUrl, seeder, teardown, steps, variables, viewport, llmFallbackOnFail
+│   ├── test_step.dart          # instruction, hint, assert, timeout, call, withVars, resolvedAction
 │   ├── http_hook.dart          # url, method, headers, body, timeoutSeconds
 │   ├── llm_action.dart         # ActionType enum + LlmAction (x, y, value, key, ...)
 │   ├── step_result.dart        # stepId, success, screenshots, duration, subStepResults
@@ -535,10 +558,10 @@ lib/
 │   ├── js_builder.dart         # generates JS for each ActionType
 │   ├── llm_service.dart        # OpenAI-compatible vision API (OVH and Vertex AI)
 │   ├── http_hook_service.dart  # seeder / teardown HTTP calls
-│   ├── test_runner.dart        # orchestration (standard, explore, and call-step modes)
+│   ├── test_runner.dart        # orchestration (pre-computed, standard LLM, and call-step modes)
 │   └── storage_service.dart    # YAML load/save, run persistence
 ├── cubits/
-│   ├── builder/                # BuilderCubit + BuilderState (test editor)
+│   ├── builder/                # BuilderCubit + BuilderState (coop builder with live WebView)
 │   ├── runner/                 # RunnerCubit + RunnerState (execution + live results)
 │   └── settings/               # SettingsCubit + SettingsState (provider config)
 ├── screens/
@@ -546,22 +569,33 @@ lib/
 │   ├── builder/
 │   │   ├── builder_screen.dart
 │   │   ├── test_form.dart
-│   │   └── step_list_editor.dart  # Normal / Explore / Call sub-test step modes
+│   │   └── step_list_editor.dart  # Normal / Call sub-test step modes + AI coop controls
 │   ├── runner/
 │   │   ├── runner_screen.dart
 │   │   ├── run_view.dart
 │   │   └── results_view.dart
 │   └── settings_screen.dart        # provider cards with per-provider config dialogs
 └── widgets/
+    ├── action_overlay.dart         # visual overlay for pending AI actions on builder WebView
     ├── step_card.dart
     ├── screenshot_panel.dart
     ├── test_case_tile.dart
     └── folder_picker_bar.dart
 
+tests/
+└── todomvc_sample.yaml         # sample test on public TodoMVC React app
+
 test/
 ├── js_builder_test.dart        # unit tests for JsBuilder (all action types)
-├── storage_service_test.dart   # unit tests for YAML parsing and serialization
-└── models_test.dart            # unit tests for model construction and defaults
+├── storage_service_test.dart   # unit tests for YAML parsing, serialization, resolved_action, viewport
+├── models_test.dart            # unit tests for model construction, defaults, resolvedAction, viewport
+├── llm_service_test.dart       # unit tests for LLM API client (parsing, fallback, rate limits)
+├── webview_service_test.dart   # unit tests for WebView service (state, actions)
+├── http_hook_service_test.dart # unit tests for HTTP seeder/teardown hooks
+├── report_service_test.dart    # unit tests for HTML report generation
+├── settings_cubit_test.dart    # unit tests for settings state management
+├── maestro_translator_test.dart # unit tests for Maestro YAML translation
+└── exceptions_test.dart        # unit tests for custom exception classes
 ```
 
 ---
@@ -577,9 +611,10 @@ flutter test
 Run a single test file:
 
 ```bash
-flutter test test/js_builder_test.dart
-flutter test test/storage_service_test.dart
 flutter test test/models_test.dart
+flutter test test/storage_service_test.dart
+flutter test test/js_builder_test.dart
+flutter test test/llm_service_test.dart
 ```
 
 Run with verbose output:

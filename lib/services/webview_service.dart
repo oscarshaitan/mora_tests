@@ -25,6 +25,10 @@ class WebViewService {
   /// Coordinates from _resolveCenter (getBoundingClientRect) are already CSS px — no division needed.
   double _dpr = 1.0;
 
+  /// The current devicePixelRatio. Used to convert physical-pixel coordinates
+  /// (from LLM screenshots) to logical pixels (for overlay positioning).
+  double get dpr => _dpr;
+
   WebViewService(this._jsBuilder);
 
   bool get isReady => _controller != null;

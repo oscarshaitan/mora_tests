@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../cubits/builder/builder_cubit.dart';
+import '../../cubits/builder/builder_state.dart';
+import '../../models/llm_action.dart';
 import '../../models/test_case.dart';
 import '../../models/test_step.dart';
 
-enum _StepMode { normal, explore, call }
+enum _StepMode { normal, call }
 
 class StepListEditor extends StatelessWidget {
   final TestCase test;
@@ -16,46 +18,60 @@ class StepListEditor extends StatelessWidget {
   Widget build(BuildContext context) {
     final cubit = context.read<BuilderCubit>();
 
-    return Column(
-      children: [
-        _InsertDivider(onInsert: () => cubit.addStepAt(0)),
-        ReorderableListView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          buildDefaultDragHandles: false,
-          padding: EdgeInsets.zero,
-          itemCount: test.steps.length,
-          onReorder: cubit.reorderSteps,
-          itemBuilder: (context, i) {
-            final step = test.steps[i];
-            return Column(
-              key: ValueKey(step.id),
-              children: [
-                _StepCard(
-                  step: step,
-                  index: i,
-                  onChanged: (updated) {
-                    final steps = [...test.steps];
-                    steps[i] = updated;
-                    cubit.updateTest(test.copyWith(steps: steps));
-                  },
-                  onDelete: () => cubit.removeStep(step.id),
-                ),
-                if (i < test.steps.length - 1)
-                  _InsertDivider(
-                    onInsert: () => cubit.addStepAt(i + 1),
-                  ),
-              ],
-            );
-          },
-        ),
-        const SizedBox(height: 24),
-        OutlinedButton.icon(
-          onPressed: cubit.addStep,
-          icon: const Icon(Icons.add, size: 16),
-          label: const Text('Add Step'),
-        ),
-      ],
+    return BlocBuilder<BuilderCubit, BuilderState>(
+      buildWhen: (prev, curr) =>
+          prev.resolvingStepId != curr.resolvingStepId ||
+          prev.pendingStepId != curr.pendingStepId ||
+          prev.pendingAction != curr.pendingAction,
+      builder: (context, builderState) {
+        return Column(
+          children: [
+            _InsertDivider(onInsert: () => cubit.addStepAt(0)),
+            ReorderableListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              buildDefaultDragHandles: false,
+              padding: EdgeInsets.zero,
+              itemCount: test.steps.length,
+              onReorder: cubit.reorderSteps,
+              itemBuilder: (context, i) {
+                final step = test.steps[i];
+                return Column(
+                  key: ValueKey(step.id),
+                  children: [
+                    _StepCard(
+                      step: step,
+                      index: i,
+                      isResolving:
+                          builderState.resolvingStepId == step.id,
+                      pendingAction:
+                          builderState.pendingStepId == step.id
+                              ? builderState.pendingAction
+                              : null,
+                      onChanged: (updated) {
+                        final steps = [...test.steps];
+                        steps[i] = updated;
+                        cubit.updateTest(test.copyWith(steps: steps));
+                      },
+                      onDelete: () => cubit.removeStep(step.id),
+                    ),
+                    if (i < test.steps.length - 1)
+                      _InsertDivider(
+                        onInsert: () => cubit.addStepAt(i + 1),
+                      ),
+                  ],
+                );
+              },
+            ),
+            const SizedBox(height: 24),
+            OutlinedButton.icon(
+              onPressed: cubit.addStep,
+              icon: const Icon(Icons.add, size: 16),
+              label: const Text('Add Step'),
+            ),
+          ],
+        );
+      },
     );
   }
 }
@@ -63,12 +79,16 @@ class StepListEditor extends StatelessWidget {
 class _StepCard extends StatefulWidget {
   final TestStep step;
   final int index;
+  final bool isResolving;
+  final LlmAction? pendingAction;
   final ValueChanged<TestStep> onChanged;
   final VoidCallback onDelete;
 
   const _StepCard({
     required this.step,
     required this.index,
+    required this.isResolving,
+    required this.pendingAction,
     required this.onChanged,
     required this.onDelete,
   });
@@ -83,7 +103,6 @@ class _StepCardState extends State<_StepCard> {
   late TextEditingController _hintCtrl;
   late TextEditingController _assertCtrl;
   late TextEditingController _timeoutCtrl;
-  late TextEditingController _subStepsCtrl;
   late TextEditingController _callCtrl;
   late List<_WithVarEntry> _withVarsEntries;
 
@@ -94,19 +113,11 @@ class _StepCardState extends State<_StepCard> {
   }
 
   void _initFrom(TestStep step) {
-    if (step.call != null) {
-      _mode = _StepMode.call;
-    } else if (step.maxSubSteps != null) {
-      _mode = _StepMode.explore;
-    } else {
-      _mode = _StepMode.normal;
-    }
+    _mode = step.call != null ? _StepMode.call : _StepMode.normal;
     _instructionCtrl = TextEditingController(text: step.instruction);
     _hintCtrl = TextEditingController(text: step.hint ?? '');
     _assertCtrl = TextEditingController(text: step.assertion ?? '');
     _timeoutCtrl = TextEditingController(text: step.timeoutSeconds.toString());
-    _subStepsCtrl =
-        TextEditingController(text: (step.maxSubSteps ?? 10).toString());
     _callCtrl = TextEditingController(text: step.call ?? '');
     _withVarsEntries = step.withVars.entries
         .map((e) => _WithVarEntry(
@@ -121,7 +132,6 @@ class _StepCardState extends State<_StepCard> {
     _hintCtrl.dispose();
     _assertCtrl.dispose();
     _timeoutCtrl.dispose();
-    _subStepsCtrl.dispose();
     _callCtrl.dispose();
     for (final e in _withVarsEntries) {
       e.keyCtrl.dispose();
@@ -154,8 +164,6 @@ class _StepCardState extends State<_StepCard> {
           ? null
           : _assertCtrl.text,
       timeoutSeconds: int.tryParse(_timeoutCtrl.text) ?? 30,
-      maxSubSteps:
-          _mode == _StepMode.explore ? (int.tryParse(_subStepsCtrl.text) ?? 10) : null,
       call: _mode == _StepMode.call
           ? (_callCtrl.text.isEmpty ? null : _callCtrl.text)
           : null,
@@ -292,11 +300,6 @@ class _StepCardState extends State<_StepCard> {
                   icon: Icon(Icons.play_arrow_outlined, size: 16),
                 ),
                 ButtonSegment(
-                  value: _StepMode.explore,
-                  label: Text('Explore'),
-                  icon: Icon(Icons.explore_outlined, size: 16),
-                ),
-                ButtonSegment(
                   value: _StepMode.call,
                   label: Text('Call sub-test'),
                   icon: Icon(Icons.call_merge, size: 16),
@@ -368,23 +371,16 @@ class _StepCardState extends State<_StepCard> {
                       onChanged: (_) => _notify(),
                     ),
                   ),
-                  if (_mode == _StepMode.explore) ...[
-                    const SizedBox(width: 16),
-                    SizedBox(
-                      width: 100,
-                      child: TextFormField(
-                        controller: _subStepsCtrl,
-                        decoration: const InputDecoration(
-                          labelText: 'Max sub-steps',
-                          border: OutlineInputBorder(),
-                          isDense: true,
-                        ),
-                        keyboardType: TextInputType.number,
-                        onChanged: (_) => _notify(),
-                      ),
-                    ),
-                  ],
                 ],
+              ),
+
+              // ── AI Coop Controls ───────────────────────────────────
+              const SizedBox(height: 14),
+              _AiCoopSection(
+                step: widget.step,
+                mode: _mode,
+                isResolving: widget.isResolving,
+                pendingAction: widget.pendingAction,
               ),
             ],
 
@@ -512,6 +508,255 @@ class _StepCardState extends State<_StepCard> {
     );
   }
 }
+
+// ── AI Coop Section ──────────────────────────────────────────────────────────
+
+class _AiCoopSection extends StatelessWidget {
+  final TestStep step;
+  final _StepMode mode;
+  final bool isResolving;
+  final LlmAction? pendingAction;
+
+  const _AiCoopSection({
+    required this.step,
+    required this.mode,
+    required this.isResolving,
+    required this.pendingAction,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cubit = context.read<BuilderCubit>();
+    final cs = Theme.of(context).colorScheme;
+
+    // Show pending action preview with accept/reject
+    if (pendingAction != null) {
+      return _PendingActionCard(action: pendingAction!);
+    }
+
+    // Show resolved badge if step already has a pre-computed action
+    if (step.resolvedAction != null) {
+      return _ResolvedBadge(action: step.resolvedAction!, stepId: step.id);
+    }
+
+    // Show loading spinner while resolving
+    if (isResolving) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: cs.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: cs.outlineVariant),
+        ),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: cs.primary,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Text(
+              'Asking AI...',
+              style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Show "Ask AI" button
+    final canResolve = step.instruction.trim().isNotEmpty;
+    return OutlinedButton.icon(
+      onPressed: canResolve ? () => cubit.resolveStep(step.id) : null,
+      icon: const Icon(Icons.psychology_outlined, size: 16),
+      label: const Text('Ask AI'),
+      style: OutlinedButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        visualDensity: VisualDensity.compact,
+      ),
+    );
+  }
+}
+
+// ── Pending Action Card (accept / reject) ────────────────────────────────────
+
+class _PendingActionCard extends StatelessWidget {
+  final LlmAction action;
+  const _PendingActionCard({required this.action});
+
+  @override
+  Widget build(BuildContext context) {
+    final cubit = context.read<BuilderCubit>();
+    final cs = Theme.of(context).colorScheme;
+    final confidence = '${(action.confidence * 100).toStringAsFixed(0)}%';
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: cs.primaryContainer.withValues(alpha: 0.3),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: cs.primary.withValues(alpha: 0.5)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.psychology, size: 16, color: cs.primary),
+              const SizedBox(width: 6),
+              Text(
+                'AI suggests: ${action.type.name}',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: cs.onSurface,
+                ),
+              ),
+              const Spacer(),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: cs.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  confidence,
+                  style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
+                ),
+              ),
+            ],
+          ),
+          if (action.x != null && action.y != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              'at (${action.x!.toStringAsFixed(0)}, ${action.y!.toStringAsFixed(0)})',
+              style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+            ),
+          ],
+          if (action.value != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              'value: "${action.value}"',
+              style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+            ),
+          ],
+          if (action.cssSelector != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              'selector: ${action.cssSelector}',
+              style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+            ),
+          ],
+          if (action.reasoning.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              action.reasoning,
+              style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              OutlinedButton.icon(
+                onPressed: cubit.rejectAction,
+                icon: const Icon(Icons.close, size: 14),
+                label: const Text('Reject'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: cs.error,
+                  side: BorderSide(color: cs.error),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  visualDensity: VisualDensity.compact,
+                ),
+              ),
+              const SizedBox(width: 8),
+              FilledButton.icon(
+                onPressed: cubit.acceptAction,
+                icon: const Icon(Icons.check, size: 14),
+                label: const Text('Accept'),
+                style: FilledButton.styleFrom(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  visualDensity: VisualDensity.compact,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Resolved Badge ───────────────────────────────────────────────────────────
+
+class _ResolvedBadge extends StatelessWidget {
+  final LlmAction action;
+  final String stepId;
+  const _ResolvedBadge({required this.action, required this.stepId});
+
+  String get _label {
+    final parts = <String>[action.type.name];
+    if (action.x != null && action.y != null) {
+      parts.add(
+          'at (${action.x!.toStringAsFixed(0)}, ${action.y!.toStringAsFixed(0)})');
+    }
+    if (action.value != null) {
+      final v = action.value!.length > 20
+          ? '${action.value!.substring(0, 17)}...'
+          : action.value!;
+      parts.add('"$v"');
+    }
+    return parts.join(' ');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cubit = context.read<BuilderCubit>();
+    final cs = Theme.of(context).colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.green.shade50,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: Colors.green.shade300),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.check_circle_outline,
+              size: 16, color: Colors.green.shade700),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              _label,
+              style: TextStyle(fontSize: 12, color: Colors.green.shade900),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          InkWell(
+            onTap: () => cubit.clearResolvedAction(stepId),
+            borderRadius: BorderRadius.circular(8),
+            child: Padding(
+              padding: const EdgeInsets.all(2),
+              child: Icon(Icons.close, size: 14, color: cs.onSurfaceVariant),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Insert Divider ───────────────────────────────────────────────────────────
 
 class _InsertDivider extends StatefulWidget {
   final VoidCallback onInsert;
